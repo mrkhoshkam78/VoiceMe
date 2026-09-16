@@ -38,5 +38,18 @@ export function createNodes(ctx, params = {}) {
   comp.connect(makeUp);
   makeUp.connect(output);
 
-  return { input, output, nodes: [input, hp, mud, presence, deHarsh, air, comp, makeUp, output] };
+  return {
+    input, output,
+    nodes: [input, hp, mud, presence, deHarsh, air, comp, makeUp, output],
+    update(p) {
+      const inten = p.intensity ?? intensity;
+      hp.frequency.setTargetAtTime(45 + inten * 25, ctx.currentTime, 0.04);
+      mud.gain.setTargetAtTime(-1.5 - inten * 1.5, ctx.currentTime, 0.04);
+      presence.gain.setTargetAtTime(2.5 + inten * 3, ctx.currentTime, 0.04);
+      deHarsh.gain.setTargetAtTime(inten > 0.55 ? -2 : 0, ctx.currentTime, 0.04);
+      air.gain.setTargetAtTime(1.5 + inten * 2, ctx.currentTime, 0.04);
+      comp.ratio.setTargetAtTime(2.0 + inten, ctx.currentTime, 0.04);
+      makeUp.gain.setTargetAtTime(1 + inten * 0.1, ctx.currentTime, 0.04);
+    }
+  };
 }

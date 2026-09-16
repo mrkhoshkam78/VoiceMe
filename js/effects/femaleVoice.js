@@ -1,5 +1,6 @@
 /**
  * Female / Girl Voice – audible pitch + formant approximation
+ * Real-time: EQ + dynamics update; pitchFactor requires rebuild
  */
 import { createGain, createBiquad } from './baseEffect.js';
 
@@ -43,6 +44,13 @@ export function createNodes(ctx, params = {}) {
 
   return {
     input, output, pitchFactor,
-    nodes: [input, highpass, peak, highShelf, comp, output]
+    nodes: [input, highpass, peak, highShelf, comp, output],
+    update(p) {
+      const inten = p.intensity ?? intensity;
+      // Live EQ updates (pitch still needs rebuild)
+      highpass.frequency.setTargetAtTime(90 + inten * 50, ctx.currentTime, 0.04);
+      peak.gain.setTargetAtTime(4 + inten * 5, ctx.currentTime, 0.04);
+      highShelf.gain.setTargetAtTime(4 + inten * 6, ctx.currentTime, 0.04);
+    }
   };
 }

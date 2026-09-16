@@ -38,5 +38,15 @@ export function createNodes(ctx, params = {}) {
   comp.connect(makeUp);
   makeUp.connect(output);
 
-  return { input, output, nodes: [input, hp, lp, peak, shaper, hs, comp, makeUp, output] };
+  return {
+    input, output,
+    nodes: [input, hp, lp, peak, shaper, hs, comp, makeUp, output],
+    update(p) {
+      const inten = p.intensity ?? intensity;
+      hp.frequency.setTargetAtTime(450 + inten * 250, ctx.currentTime, 0.04);
+      lp.frequency.setTargetAtTime(2600 - inten * 500, ctx.currentTime, 0.04);
+      peak.gain.setTargetAtTime(8 + inten * 5, ctx.currentTime, 0.04);
+      hs.gain.setTargetAtTime(3 + inten * 4, ctx.currentTime, 0.04);
+    }
+  };
 }

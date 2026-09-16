@@ -62,12 +62,17 @@ export class AudioEngine {
   updateEffectParams(id, params) {
     const e = this.effects.find(x => x.id === id);
     if (!e) return;
+    const prev = { ...e.params };
     Object.assign(e.params, params);
     this.player.setEffects(this.effects);
 
+    // Pitch-based effects need rebuild when intensity/mode changes
+    const needsRebuild = (id === 'femaleVoice' || id === 'deepVoice') &&
+      (params.intensity !== undefined || params.mode !== undefined);
+
     // 1) Prefer live AudioParam update (no audible gap)
     const live = this.graph.updateParams(id, params);
-    if (live) return;
+    if (live && !needsRebuild) return;
 
     // 2) Effect needs structural rebuild (e.g. pitchFactor) while playing
     if (this.player.isPlaying) {

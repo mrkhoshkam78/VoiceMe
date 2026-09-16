@@ -70,11 +70,12 @@ export function createNodes(ctx, params = {}) {
     input, output,
     nodes: [input, hp, presence, air, comp, dry, convolver, wetLp, wet, output],
     update(p) {
-      if (p.wet !== undefined) {
-        const w = p.wet;
-        const inten = p.intensity ?? intensity;
-        dry.gain.setTargetAtTime(1 - w, ctx.currentTime, 0.05);
-        wet.gain.setTargetAtTime(w * inten, ctx.currentTime, 0.05);
+      const w = p.wet ?? wetAmt;
+      const inten = p.intensity ?? intensity;
+      dry.gain.setTargetAtTime(1 - w, ctx.currentTime, 0.05);
+      wet.gain.setTargetAtTime(w * inten, ctx.currentTime, 0.05);
+      if (p.intensity !== undefined) {
+        presence.gain.setTargetAtTime(2 + inten * 2, ctx.currentTime, 0.05);
       }
     }
   };

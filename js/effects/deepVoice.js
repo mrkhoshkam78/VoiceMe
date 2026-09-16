@@ -1,5 +1,6 @@
 /**
  * Deep / Thick Voice
+ * Real-time: EQ + dynamics; pitchFactor requires rebuild
  */
 import { createGain, createBiquad } from './baseEffect.js';
 
@@ -41,6 +42,13 @@ export function createNodes(ctx, params = {}) {
 
   return {
     input, output, pitchFactor,
-    nodes: [input, lowShelf, mid, lowpass, comp, makeUp, output]
+    nodes: [input, lowShelf, mid, lowpass, comp, makeUp, output],
+    update(p) {
+      const inten = p.intensity ?? intensity;
+      lowShelf.gain.setTargetAtTime(5 + inten * 8, ctx.currentTime, 0.04);
+      mid.gain.setTargetAtTime(2 + inten * 3, ctx.currentTime, 0.04);
+      lowpass.frequency.setTargetAtTime(5500 - inten * 1800, ctx.currentTime, 0.04);
+      makeUp.gain.setTargetAtTime(1 + inten * 0.2, ctx.currentTime, 0.04);
+    }
   };
 }

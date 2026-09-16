@@ -1,5 +1,5 @@
 /**
- * Audio Editor V1.04-RT – Application (UI layer only) — effect toggle FIXED
+ * Audio Editor V1.04-FULL – Application (UI layer only) — FULL – Real MP3+FLAC + Live Updates
  * Audio logic lives in audio-engine/
  */
 
@@ -133,6 +133,14 @@ class App {
       <select id="exportFormat" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="فرمت خروجی">
         ${formats.map(f => `<option value="${f.id}">${f.label}</option>`).join('')}
       </select>
+      <select id="exportBitrate" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="بیت‌ریت MP3">
+        <option value="128">128 kbps</option>
+        <option value="192" selected>192 kbps</option>
+        <option value="256">256 kbps</option>
+        <option value="320">320 kbps</option>
+        <option value="96">96 kbps</option>
+        <option value="64">64 kbps</option>
+      </select>
       <select id="exportChannels" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="کانال">
         <option value="2">استریو</option>
         <option value="1">مونو</option>
@@ -145,6 +153,7 @@ class App {
       </select>`;
     bar.insertBefore(wrap, bar.firstChild);
     this.$.exportFormat = document.getElementById('exportFormat');
+    this.$.exportBitrate = document.getElementById('exportBitrate');
     this.$.exportChannels = document.getElementById('exportChannels');
     this.$.exportSampleRate = document.getElementById('exportSampleRate');
   }
@@ -604,10 +613,11 @@ class App {
     const format = this.$.exportFormat?.value || 'wav';
     const channels = parseInt(this.$.exportChannels?.value || '2', 10);
     const sr = parseInt(this.$.exportSampleRate?.value || '0', 10);
+    const bitrate = parseInt(this.$.exportBitrate?.value || '192', 10);
 
     try {
       const name = await this.engine.export(
-        { format, channels, sampleRate: sr || undefined },
+        { format, channels, sampleRate: sr || undefined, bitrate, bitDepth: 16 },
         (p, label) => {
           this.$.progressFill.style.width = Math.round(p * 100) + '%';
           this.$.overlayText.textContent = label || `پردازش... ${Math.round(p * 100)}٪`;
