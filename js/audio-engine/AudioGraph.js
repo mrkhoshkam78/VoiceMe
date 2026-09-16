@@ -73,9 +73,18 @@ export class AudioGraph {
       ? effects.filter(e => e.enabled)
       : [];
 
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug('[AudioGraph] build mode=%s enabled=%d ids=%s',
+        mode, enabled.length, enabled.map(e => e.id).join(','));
+    }
+
     for (const effect of enabled) {
       try {
         const result = createEffectNodes(ctx, effect.id, effect.params);
+        if (!result || !result.input || !result.output) {
+          console.error('[AudioGraph] effect returned invalid nodes:', effect.id);
+          continue;
+        }
         this.chain.push({
           id: effect.id,
           nodes: result.nodes || [],
@@ -88,6 +97,7 @@ export class AudioGraph {
         current = result.output;
       } catch (err) {
         console.error('[AudioGraph] effect failed:', effect.id, err);
+        // do not break the chain — signal continues to next / master
       }
     }
 

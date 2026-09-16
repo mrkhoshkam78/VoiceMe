@@ -64,9 +64,13 @@ export class AudioEngine {
     if (!e) return;
     Object.assign(e.params, params);
     this.player.setEffects(this.effects);
-    // try live update without rebuild
+
+    // 1) Prefer live AudioParam update (no audible gap)
     const live = this.graph.updateParams(id, params);
-    if (!live && this.player.isPlaying) {
+    if (live) return;
+
+    // 2) Effect needs structural rebuild (e.g. pitchFactor) while playing
+    if (this.player.isPlaying) {
       this.player.rebuild();
     }
   }
@@ -129,6 +133,7 @@ export class AudioEngine {
 
   /** Diagnostics for development */
   getDiagnostics() {
+    const chain = this.graph.chain || [];
     return {
       contextState: this.ctxManager.state,
       sampleRate: this.ctxManager.sampleRate,
@@ -137,8 +142,26 @@ export class AudioEngine {
       currentTime: this.currentTime,
       isPlaying: this.isPlaying,
       activeEffects: this.effects.filter(e => e.enabled).map(e => e.id),
+      graphChain: chain.map(c => c.id),
+      sourceConnected: !!this.graph.source,
+      masterGain: !!this.graph.masterGain,
+      analyser: !!this.graph.analyser,
+      playbackRate: this.graph.playbackRate || 1,
       previewMode: this.previewMode,
-      bufferSampleRate: this.originalBuffer?.sampleRate ?? 0
+      bufferSampleRate: this.originalBuffer?.sampleRate ?? 0,
+      signalPath: this._describeSignalPath()
     };
+  }
+
+  _describeSignalPath() {
+    const parts = ['Source'];
+    const enabled = this.effects.filter(e => e.enabled);
+    if (this.previewMode === 'original' || enabled.length === 0) {
+      parts.push('(bypass)');
+    } else {
+      enabled.forEach(e => parts.push(e.id));
+    }
+    parts.push('MasterGain', 'Analyser', 'Destination');
+    return parts.join(' → ');
   }
 }

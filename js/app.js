@@ -113,8 +113,8 @@ class App {
       item.innerHTML = `
         <div class="fx-icon">${ICONS[meta.icon] || ICONS.quality}</div>
         <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
-        <label class="fx-toggle" onclick="event.stopPropagation()">
-          <input type="checkbox" data-toggle="${id}">
+        <label class="fx-toggle" data-toggle-wrap="${id}">
+          <input type="checkbox" data-toggle="${id}" aria-label="فعال‌سازی ${meta.name}">
           <span class="fx-toggle-track"></span>
         </label>`;
       sidebar.appendChild(item);
@@ -207,10 +207,19 @@ class App {
     on(this.$.modeOriginal, 'click', () => this._setMode('original'));
     on(this.$.modeProcessed, 'click', () => this._setMode('processed'));
 
+    // CRITICAL: listen to 'change' on checkboxes — click alone was blocked by stopPropagation
+    on(this.$.effectsSidebar, 'change', e => {
+      const input = e.target;
+      if (input && input.matches && input.matches('input[data-toggle]')) {
+        const id = input.dataset.toggle;
+        this._toggleEffect(id, input.checked);
+      }
+    });
+
     on(this.$.effectsSidebar, 'click', e => {
-      const toggle = e.target.closest('[data-toggle]');
-      if (toggle) {
-        this._toggleEffect(toggle.dataset.toggle, toggle.checked);
+      // clicks on the toggle itself should not only-select; change handler enables
+      if (e.target.closest('[data-toggle-wrap], input[data-toggle]')) {
+        e.stopPropagation();
         return;
       }
       const item = e.target.closest('.effect-item');
@@ -226,7 +235,10 @@ class App {
       const value = parseFloat(input.value) * scale;
       this.effectState[id].params[param] = value;
       this._updateValLabel(input, param, value);
-      this._syncEffects();
+      // Live DSP update while playing — no full chain rebuild if effect supports it
+      if (this.effectState[id].enabled) {
+        this.engine.updateEffectParams(id, { ...this.effectState[id].params });
+      }
     }, 50));
 
     on(this.$.controlsContent, 'click', e => {
@@ -371,11 +383,21 @@ class App {
   }
 
   _toggleEffect(id, enabled) {
-    this.effectState[id].enabled = enabled;
+    this.effectState[id].enabled = !!enabled;
     const item = this.$.effectsSidebar.querySelector(`[data-id="${id}"]`);
-    if (item) item.classList.toggle('active-fx', enabled);
+    if (item) item.classList.toggle('active-fx', !!enabled);
+    // Keep checkbox in sync if toggled programmatically
+    const cb = this.$.effectsSidebar.querySelector(`input[data-toggle="${id}"]`);
+    if (cb && cb.checked !== !!enabled) cb.checked = !!enabled;
+
     this._syncEffects();
     this._updateChain();
+
+    if (typeof console !== 'undefined') {
+      console.debug('[Effect]', id, enabled ? 'ON' : 'OFF',
+        'path=', this.engine.getDiagnostics?.()?.signalPath);
+    }
+
     if (enabled) this._selectEffect(id);
     else if (this.selectedEffect === id) this._renderControls(id);
   }
