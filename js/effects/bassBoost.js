@@ -1,59 +1,46 @@
-/**
- * Bass Boost
- */
-
 import { createGain, createBiquad } from './baseEffect.js';
 
 export const meta = {
   id: 'bassBoost',
   name: 'تقویت بیس',
-  description: 'افزایش فرکانس‌های پایین با کنترل شدت',
-  icon: '🔉',
+  description: 'افزایش فرکانس‌های پایین',
+  icon: 'bass',
   category: 'enhancement',
-  defaultParams: {
-    amount: 6, // dB 0-15
-    frequency: 100 // Hz
-  }
+  defaultParams: { amount: 8, frequency: 95 }
 };
 
 export function createNodes(ctx, params = {}) {
-  const amount = params.amount ?? 6;
-  const freq = params.frequency ?? 100;
+  const amount = params.amount ?? 8;
+  const freq = params.frequency ?? 95;
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
-  const lowshelf = createBiquad(ctx, 'lowshelf', freq, 1, amount);
-  // Gentle mid cut to prevent muddiness when boosting a lot
-  const midCut = createBiquad(ctx, 'peaking', 350, 1.2, amount > 8 ? -1.5 : 0);
+  const shelf = createBiquad(ctx, 'lowshelf', freq, 1, amount);
+  const midCut = createBiquad(ctx, 'peaking', 320, 1.3, amount > 9 ? -2 : 0);
 
-  // Soft limiter-ish compressor to control peaks from bass boost
-  const compressor = ctx.createDynamicsCompressor();
-  compressor.threshold.value = -16;
-  compressor.knee.value = 8;
-  compressor.ratio.value = 2.5;
-  compressor.attack.value = 0.01;
-  compressor.release.value = 0.2;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14;
+  comp.knee.value = 6;
+  comp.ratio.value = 2.8;
+  comp.attack.value = 0.008;
+  comp.release.value = 0.18;
 
-  const makeUp = createGain(ctx, 1);
-
-  input.connect(lowshelf);
-  lowshelf.connect(midCut);
-  midCut.connect(compressor);
-  compressor.connect(makeUp);
-  makeUp.connect(output);
+  input.connect(shelf);
+  shelf.connect(midCut);
+  midCut.connect(comp);
+  comp.connect(output);
 
   return {
-    input,
-    output,
-    nodes: [input, lowshelf, midCut, compressor, makeUp, output],
-    update(params) {
-      if (params.amount !== undefined) {
-        lowshelf.gain.setTargetAtTime(params.amount, ctx.currentTime, 0.05);
-        midCut.gain.setTargetAtTime(params.amount > 8 ? -1.5 : 0, ctx.currentTime, 0.05);
+    input, output,
+    nodes: [input, shelf, midCut, comp, output],
+    update(p) {
+      if (p.amount !== undefined) {
+        shelf.gain.setTargetAtTime(p.amount, ctx.currentTime, 0.04);
+        midCut.gain.setTargetAtTime(p.amount > 9 ? -2 : 0, ctx.currentTime, 0.04);
       }
-      if (params.frequency !== undefined) {
-        lowshelf.frequency.setTargetAtTime(params.frequency, ctx.currentTime, 0.05);
+      if (p.frequency !== undefined) {
+        shelf.frequency.setTargetAtTime(p.frequency, ctx.currentTime, 0.04);
       }
     }
   };

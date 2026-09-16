@@ -1,57 +1,46 @@
 /**
- * Deep / Thick Voice Effect
- * Lowers pitch and adds body via low-shelf + mild saturation approximation.
+ * Deep / Thick Voice
  */
-
 import { createGain, createBiquad } from './baseEffect.js';
 
 export const meta = {
   id: 'deepVoice',
-  name: 'صدای عمیق / ضخیم',
-  description: 'کاهش Pitch و افزایش ضخامت و عمق صدا',
-  icon: '🧔',
+  name: 'صدای عمیق',
+  description: 'کاهش Pitch و افزایش ضخامت صدا',
+  icon: 'deep',
   category: 'voice',
-  defaultParams: {
-    intensity: 0.6
-  }
+  defaultParams: { intensity: 0.7 }
 };
 
 export function createNodes(ctx, params = {}) {
-  const intensity = params.intensity ?? 0.6;
-
-  // Pitch factor < 1
-  const pitchFactor = 1 - intensity * 0.25; // 1.0 → 0.75
+  const intensity = params.intensity ?? 0.7;
+  const pitchFactor = 1 - intensity * 0.32; // down to ~0.68
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
-  // Add low-end body
-  const lowShelf = createBiquad(ctx, 'lowshelf', 180, 1, 4 + intensity * 6);
-  const midBoost = createBiquad(ctx, 'peaking', 400, 1.0, 1.5 + intensity * 2);
-  // Soft high cut to thicken
-  const highCut = createBiquad(ctx, 'lowpass', 6000 - intensity * 2000, 0.8);
+  const lowShelf = createBiquad(ctx, 'lowshelf', 160, 1, 5 + intensity * 8);
+  const mid = createBiquad(ctx, 'peaking', 380, 1.1, 2 + intensity * 3);
+  const lowpass = createBiquad(ctx, 'lowpass', 5500 - intensity * 1800, 0.75);
 
-  const compressor = ctx.createDynamicsCompressor();
-  compressor.threshold.value = -20;
-  compressor.knee.value = 10;
-  compressor.ratio.value = 2;
-  compressor.attack.value = 0.02;
-  compressor.release.value = 0.2;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -18;
+  comp.knee.value = 10;
+  comp.ratio.value = 2.2;
+  comp.attack.value = 0.015;
+  comp.release.value = 0.2;
 
-  // Slight overall gain compensation
-  const makeUp = createGain(ctx, 1 + intensity * 0.15);
+  const makeUp = createGain(ctx, 1 + intensity * 0.2);
 
   input.connect(lowShelf);
-  lowShelf.connect(midBoost);
-  midBoost.connect(highCut);
-  highCut.connect(compressor);
-  compressor.connect(makeUp);
+  lowShelf.connect(mid);
+  mid.connect(lowpass);
+  lowpass.connect(comp);
+  comp.connect(makeUp);
   makeUp.connect(output);
 
   return {
-    input,
-    output,
-    pitchFactor,
-    nodes: [input, lowShelf, midBoost, highCut, compressor, makeUp, output]
+    input, output, pitchFactor,
+    nodes: [input, lowShelf, mid, lowpass, comp, makeUp, output]
   };
 }
