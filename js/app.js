@@ -150,35 +150,38 @@ class App {
   }
 
   _bindEvents() {
-    this.$.themeBtn.addEventListener('click', () => this._toggleTheme());
+    const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 
-    this.$.btnPickFile.addEventListener('click', e => { e.stopPropagation(); this.$.fileInput.click(); });
-    this.$.uploadZone.addEventListener('click', e => {
+    on(this.$.themeBtn, 'click', () => this._toggleTheme());
+
+    // label[for=fileInput] already opens the picker natively; stop zone double-handling
+    on(this.$.btnPickFile, 'click', e => { e.stopPropagation(); });
+    on(this.$.uploadZone, 'click', e => {
       if (this.$.uploadZone.classList.contains('has-file')) return;
-      if (e.target.closest('button')) return;
-      this.$.fileInput.click();
+      if (e.target.closest('button, label, a, input')) return;
+      this.$.fileInput?.click();
     });
-    this.$.fileInput.addEventListener('change', e => {
+    on(this.$.fileInput, 'change', e => {
       const f = e.target.files?.[0];
       if (f) this._handleFile(f);
     });
 
     ['dragenter', 'dragover'].forEach(ev => {
-      this.$.uploadZone.addEventListener(ev, e => { e.preventDefault(); this.$.uploadZone.classList.add('dragover'); });
+      on(this.$.uploadZone, ev, e => { e.preventDefault(); this.$.uploadZone.classList.add('dragover'); });
     });
     ['dragleave', 'drop'].forEach(ev => {
-      this.$.uploadZone.addEventListener(ev, e => { e.preventDefault(); this.$.uploadZone.classList.remove('dragover'); });
+      on(this.$.uploadZone, ev, e => { e.preventDefault(); this.$.uploadZone.classList.remove('dragover'); });
     });
-    this.$.uploadZone.addEventListener('drop', e => {
+    on(this.$.uploadZone, 'drop', e => {
       const f = e.dataTransfer?.files?.[0];
       if (f) this._handleFile(f);
     });
 
-    this.$.btnChangeFile.addEventListener('click', () => this.$.fileInput.click());
-    this.$.btnRemoveFile.addEventListener('click', () => this._removeFile());
+    on(this.$.btnChangeFile, 'click', () => this.$.fileInput?.click());
+    on(this.$.btnRemoveFile, 'click', () => this._removeFile());
 
     // Play – user gesture → resume context
-    this.$.playBtn.addEventListener('click', async () => {
+    on(this.$.playBtn, 'click', async () => {
       if (!this.engine.originalBuffer) return;
       if (this.engine.isPlaying) {
         this.engine.pause();
@@ -188,23 +191,23 @@ class App {
     });
 
     // Seek
-    this.$.seekBar.addEventListener('pointerdown', () => { this.isSeeking = true; });
-    this.$.seekBar.addEventListener('pointerup', () => {
+    on(this.$.seekBar, 'pointerdown', () => { this.isSeeking = true; });
+    on(this.$.seekBar, 'pointerup', () => {
       this.isSeeking = false;
       this.engine.seek(parseFloat(this.$.seekBar.value));
     });
-    this.$.seekBar.addEventListener('input', () => {
+    on(this.$.seekBar, 'input', () => {
       this.$.currentTime.textContent = formatDuration(parseFloat(this.$.seekBar.value));
     });
-    this.$.seekBar.addEventListener('change', () => {
+    on(this.$.seekBar, 'change', () => {
       this.isSeeking = false;
       this.engine.seek(parseFloat(this.$.seekBar.value));
     });
 
-    this.$.modeOriginal.addEventListener('click', () => this._setMode('original'));
-    this.$.modeProcessed.addEventListener('click', () => this._setMode('processed'));
+    on(this.$.modeOriginal, 'click', () => this._setMode('original'));
+    on(this.$.modeProcessed, 'click', () => this._setMode('processed'));
 
-    this.$.effectsSidebar.addEventListener('click', e => {
+    on(this.$.effectsSidebar, 'click', e => {
       const toggle = e.target.closest('[data-toggle]');
       if (toggle) {
         this._toggleEffect(toggle.dataset.toggle, toggle.checked);
@@ -214,7 +217,7 @@ class App {
       if (item) this._selectEffect(item.dataset.id);
     });
 
-    this.$.controlsContent.addEventListener('input', debounce(e => {
+    on(this.$.controlsContent, 'input', debounce(e => {
       const input = e.target.closest('[data-param]');
       if (!input) return;
       const id = input.dataset.effect;
@@ -226,7 +229,7 @@ class App {
       this._syncEffects();
     }, 50));
 
-    this.$.controlsContent.addEventListener('click', e => {
+    on(this.$.controlsContent, 'click', e => {
       const chip = e.target.closest('.option-chip');
       if (!chip) return;
       const id = chip.dataset.effect;
@@ -259,8 +262,8 @@ class App {
       this._syncEffects();
     });
 
-    this.$.btnReset.addEventListener('click', () => this._resetEffects());
-    this.$.btnExport.addEventListener('click', () => this._export());
+    on(this.$.btnReset, 'click', () => this._resetEffects());
+    on(this.$.btnExport, 'click', () => this._export());
   }
 
   _wireEngine() {
@@ -703,5 +706,13 @@ class App {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  window.audioEditorApp = new App();
+  try {
+    window.audioEditorApp = new App();
+  } catch (err) {
+    console.error('[App] boot failed', err);
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);color:#fff;display:flex;align-items:center;justify-content:center;z-index:99999;padding:2rem;text-align:center;direction:rtl;font-family:Tahoma,sans-serif';
+    el.innerHTML = '<div><b>خطا در راه‌اندازی</b><br><br><code style="font-size:12px">' + (err && err.message ? err.message : err) + '</code><br><br>صفحه را با سرور محلی باز کنید (npx serve .)</div>';
+    document.body.appendChild(el);
+  }
 });
