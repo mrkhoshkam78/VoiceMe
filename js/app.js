@@ -1,83 +1,77 @@
 /**
- * Audio Editor V1.02 – Application
+ * Audio Editor V1.03 – Application (UI layer only)
+ * Audio logic lives in audio-engine/
  */
 
-import { AudioManager } from './audio/audioManager.js';
+import { AudioEngine } from './audio-engine/AudioEngine.js';
+import { AudioExporter } from './audio-engine/AudioExporter.js';
 import { effectsRegistry, effectOrder } from './effects/index.js';
-import { formatDuration, formatFileSize, isSupportedFormat, debounce, NOTE_NAMES } from './utils/helpers.js';
+import { STYLE_PRESETS, detectKeyAndScale, applyStylePreset } from './effects/autotune.js';
+import {
+  formatDuration, formatFileSize, isSupportedFormat,
+  debounce, NOTE_NAMES, clamp
+} from './utils/helpers.js';
 
-const MAX_FILE_SIZE = 80 * 1024 * 1024;
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 const ICONS = {
   female: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M12 12v8M9 18h6"/></svg>',
-  deep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="7" r="3.5"/><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M12 14v3"/></svg>',
-  autotune: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M12 9l2 2 4-4"/></svg>',
-  speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1"/></svg>',
-  police: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L4 6v5c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V6l-8-4z"/><path d="M9 12l2 2 4-4"/></svg>',
-  echo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h4M6 8v8M10 5v14M14 8v8M18 10v4M22 12h0"/></svg>',
-  studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a5 5 0 0 1 5 5v4a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4M8 22h8"/></svg>',
-  bass: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 18c2-4 4-6 6-6s4 2 6 6 4 6 6 6"/><path d="M3 12h18"/></svg>',
+  deep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="7" r="3.5"/><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>',
+  autotune: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg>',
+  police: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L4 6v5c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V6l-8-4z"/></svg>',
+  echo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h4M6 8v8M10 5v14M14 8v8M18 10v4"/></svg>',
+  studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a5 5 0 0 1 5 5v4a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4"/></svg>',
+  bass: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 18c2-4 4-6 6-6s4 2 6 6 4 6 6 6"/></svg>',
   quality: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>',
-  volume: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>'
+  noise: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2M21 12h0"/></svg>',
+  volume: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>'
 };
 
-const CATEGORIES = {
-  voice: 'صدا',
-  environment: 'محیط',
-  enhancement: 'بهبود'
-};
+const CATEGORIES = { voice: 'صدا', environment: 'محیط', enhancement: 'بهبود' };
 
 class App {
   constructor() {
-    this.manager = new AudioManager();
+    this.engine = new AudioEngine();
     this.effectState = {};
     this.selectedEffect = null;
     this.isProcessing = false;
     this.isSeeking = false;
+    this._vizRaf = null;
+    this._smoothedWave = null;
 
     this._initTheme();
     this._initEffectState();
     this._cacheDom();
     this._renderSidebar();
     this._bindEvents();
-    this._setupManager();
+    this._wireEngine();
+    this._populateExportFormats();
   }
 
   _cacheDom() {
+    const id = (s) => document.getElementById(s);
     this.$ = {
-      uploadZone: document.getElementById('uploadZone'),
-      fileInput: document.getElementById('fileInput'),
-      fileName: document.getElementById('fileName'),
-      fileSize: document.getElementById('fileSize'),
-      fileDuration: document.getElementById('fileDuration'),
-      fileFormat: document.getElementById('fileFormat'),
-      btnPickFile: document.getElementById('btnPickFile'),
-      btnChangeFile: document.getElementById('btnChangeFile'),
-      btnRemoveFile: document.getElementById('btnRemoveFile'),
-      playerPanel: document.getElementById('playerPanel'),
-      playBtn: document.getElementById('playBtn'),
-      playIcon: document.getElementById('playIcon'),
-      currentTime: document.getElementById('currentTime'),
-      totalTime: document.getElementById('totalTime'),
-      seekBar: document.getElementById('seekBar'),
-      modeOriginal: document.getElementById('modeOriginal'),
-      modeProcessed: document.getElementById('modeProcessed'),
-      vizCanvas: document.getElementById('vizCanvas'),
-      effectsWorkspace: document.getElementById('effectsWorkspace'),
-      effectsSidebar: document.getElementById('effectsSidebar'),
-      controlsPanel: document.getElementById('controlsPanel'),
-      controlsEmpty: document.getElementById('controlsEmpty'),
-      controlsContent: document.getElementById('controlsContent'),
-      chainBar: document.getElementById('chainBar'),
-      chainFlow: document.getElementById('chainFlow'),
-      actionBar: document.getElementById('actionBar'),
-      btnReset: document.getElementById('btnReset'),
-      btnExport: document.getElementById('btnExport'),
-      overlay: document.getElementById('overlay'),
-      overlayText: document.getElementById('overlayText'),
-      progressFill: document.getElementById('progressFill'),
-      toastBox: document.getElementById('toastBox'),
-      themeBtn: document.getElementById('themeBtn')
+      uploadZone: id('uploadZone'), fileInput: id('fileInput'),
+      fileName: id('fileName'), fileSize: id('fileSize'),
+      fileDuration: id('fileDuration'), fileFormat: id('fileFormat'),
+      btnPickFile: id('btnPickFile'), btnChangeFile: id('btnChangeFile'),
+      btnRemoveFile: id('btnRemoveFile'),
+      playerPanel: id('playerPanel'), playBtn: id('playBtn'),
+      playIcon: id('playIcon'), currentTime: id('currentTime'),
+      totalTime: id('totalTime'), seekBar: id('seekBar'),
+      modeOriginal: id('modeOriginal'), modeProcessed: id('modeProcessed'),
+      vizCanvas: id('vizCanvas'),
+      effectsWorkspace: id('effectsWorkspace'), effectsSidebar: id('effectsSidebar'),
+      controlsEmpty: id('controlsEmpty'), controlsContent: id('controlsContent'),
+      chainBar: id('chainBar'), chainFlow: id('chainFlow'),
+      actionBar: id('actionBar'), btnReset: id('btnReset'), btnExport: id('btnExport'),
+      overlay: id('overlay'), overlayText: id('overlayText'), progressFill: id('progressFill'),
+      toastBox: id('toastBox'), themeBtn: id('themeBtn'),
+      // export settings (may be injected)
+      exportFormat: id('exportFormat'),
+      exportChannels: id('exportChannels'),
+      exportSampleRate: id('exportSampleRate')
     };
   }
 
@@ -87,8 +81,7 @@ class App {
   }
 
   _toggleTheme() {
-    const cur = document.documentElement.getAttribute('data-theme');
-    const next = cur === 'dark' ? 'light' : 'dark';
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('ae-theme', next);
   }
@@ -102,17 +95,7 @@ class App {
 
   _renderSidebar() {
     const sidebar = this.$.effectsSidebar;
-    // Keep title
-    const title = sidebar.querySelector('.sidebar-title');
-    sidebar.innerHTML = '';
-    if (title) sidebar.appendChild(title);
-    else {
-      const t = document.createElement('div');
-      t.className = 'sidebar-title';
-      t.textContent = 'افکت‌ها';
-      sidebar.appendChild(t);
-    }
-
+    sidebar.innerHTML = '<div class="sidebar-title">افکت‌ها</div>';
     let lastCat = null;
     effectOrder.forEach(id => {
       const meta = effectsRegistry[id].meta;
@@ -123,29 +106,54 @@ class App {
         lab.textContent = CATEGORIES[meta.category] || meta.category;
         sidebar.appendChild(lab);
       }
-
       const item = document.createElement('div');
       item.className = 'effect-item';
       item.dataset.id = id;
       item.tabIndex = 0;
-      item.setAttribute('role', 'button');
       item.innerHTML = `
         <div class="fx-icon">${ICONS[meta.icon] || ICONS.quality}</div>
         <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
         <label class="fx-toggle" onclick="event.stopPropagation()">
           <input type="checkbox" data-toggle="${id}">
           <span class="fx-toggle-track"></span>
-        </label>
-      `;
+        </label>`;
       sidebar.appendChild(item);
     });
+  }
+
+  _populateExportFormats() {
+    // Inject export settings into action bar if not present
+    const bar = this.$.actionBar?.querySelector('.action-bar-inner');
+    if (!bar || document.getElementById('exportFormat')) return;
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-left:auto;';
+    const formats = AudioExporter.availableFormats();
+    wrap.innerHTML = `
+      <select id="exportFormat" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="فرمت خروجی">
+        ${formats.map(f => `<option value="${f.id}">${f.label}</option>`).join('')}
+      </select>
+      <select id="exportChannels" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="کانال">
+        <option value="2">استریو</option>
+        <option value="1">مونو</option>
+      </select>
+      <select id="exportSampleRate" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="نرخ نمونه‌برداری">
+        <option value="0">اصلی</option>
+        <option value="44100">44100 Hz</option>
+        <option value="48000">48000 Hz</option>
+        <option value="22050">22050 Hz</option>
+      </select>`;
+    bar.insertBefore(wrap, bar.firstChild);
+    this.$.exportFormat = document.getElementById('exportFormat');
+    this.$.exportChannels = document.getElementById('exportChannels');
+    this.$.exportSampleRate = document.getElementById('exportSampleRate');
   }
 
   _bindEvents() {
     this.$.themeBtn.addEventListener('click', () => this._toggleTheme());
 
-    this.$.btnPickFile.addEventListener('click', (e) => { e.stopPropagation(); this.$.fileInput.click(); });
-    this.$.uploadZone.addEventListener('click', (e) => {
+    this.$.btnPickFile.addEventListener('click', e => { e.stopPropagation(); this.$.fileInput.click(); });
+    this.$.uploadZone.addEventListener('click', e => {
       if (this.$.uploadZone.classList.contains('has-file')) return;
       if (e.target.closest('button')) return;
       this.$.fileInput.click();
@@ -169,56 +177,54 @@ class App {
     this.$.btnChangeFile.addEventListener('click', () => this.$.fileInput.click());
     this.$.btnRemoveFile.addEventListener('click', () => this._removeFile());
 
-    this.$.playBtn.addEventListener('click', () => this._togglePlay());
+    // Play – user gesture → resume context
+    this.$.playBtn.addEventListener('click', async () => {
+      if (!this.engine.originalBuffer) return;
+      if (this.engine.isPlaying) {
+        this.engine.pause();
+      } else {
+        await this.engine.play();
+      }
+    });
 
+    // Seek
     this.$.seekBar.addEventListener('pointerdown', () => { this.isSeeking = true; });
     this.$.seekBar.addEventListener('pointerup', () => {
       this.isSeeking = false;
-      this.manager.seek(parseFloat(this.$.seekBar.value));
+      this.engine.seek(parseFloat(this.$.seekBar.value));
     });
     this.$.seekBar.addEventListener('input', () => {
-      const t = parseFloat(this.$.seekBar.value);
-      this.$.currentTime.textContent = formatDuration(t);
+      this.$.currentTime.textContent = formatDuration(parseFloat(this.$.seekBar.value));
     });
     this.$.seekBar.addEventListener('change', () => {
       this.isSeeking = false;
-      this.manager.seek(parseFloat(this.$.seekBar.value));
+      this.engine.seek(parseFloat(this.$.seekBar.value));
     });
 
     this.$.modeOriginal.addEventListener('click', () => this._setMode('original'));
     this.$.modeProcessed.addEventListener('click', () => this._setMode('processed'));
 
-    // Sidebar: select effect / toggle
     this.$.effectsSidebar.addEventListener('click', e => {
       const toggle = e.target.closest('[data-toggle]');
       if (toggle) {
-        const id = toggle.dataset.toggle;
-        this._toggleEffect(id, toggle.checked);
+        this._toggleEffect(toggle.dataset.toggle, toggle.checked);
         return;
       }
       const item = e.target.closest('.effect-item');
       if (item) this._selectEffect(item.dataset.id);
     });
 
-    this.$.effectsSidebar.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        const item = e.target.closest('.effect-item');
-        if (item) { e.preventDefault(); this._selectEffect(item.dataset.id); }
-      }
-    });
-
-    // Controls delegation
     this.$.controlsContent.addEventListener('input', debounce(e => {
       const input = e.target.closest('[data-param]');
       if (!input) return;
       const id = input.dataset.effect;
       const param = input.dataset.param;
       const scale = parseFloat(input.dataset.scale || '1');
-      let value = parseFloat(input.value) * scale;
+      const value = parseFloat(input.value) * scale;
       this.effectState[id].params[param] = value;
-      this._updateValDisplay(input, param, value);
+      this._updateValLabel(input, param, value);
       this._syncEffects();
-    }, 60));
+    }, 50));
 
     this.$.controlsContent.addEventListener('click', e => {
       const chip = e.target.closest('.option-chip');
@@ -226,6 +232,27 @@ class App {
       const id = chip.dataset.effect;
       const param = chip.dataset.param;
       const value = chip.dataset.value;
+
+      if (param === 'style') {
+        // Apply style preset
+        const preset = applyStylePreset(value);
+        Object.assign(this.effectState[id].params, preset);
+        this._renderControls(id);
+        this._syncEffects();
+        return;
+      }
+
+      if (param === 'autoMode') {
+        const on = value === 'true';
+        this.effectState[id].params.autoMode = on;
+        if (on && this.engine.originalBuffer) {
+          this._runAutoDetect(id);
+        }
+        this._renderControls(id);
+        this._syncEffects();
+        return;
+      }
+
       this.effectState[id].params[param] = value;
       chip.parentElement.querySelectorAll('.option-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
@@ -236,20 +263,22 @@ class App {
     this.$.btnExport.addEventListener('click', () => this._export());
   }
 
-  _setupManager() {
-    this.manager.onTimeUpdate = (t) => {
+  _wireEngine() {
+    this.engine.onTimeUpdate = (t) => {
       if (this.isSeeking) return;
       this.$.currentTime.textContent = formatDuration(t);
       this.$.seekBar.value = t;
-      this._drawViz();
     };
-    this.manager.onEnded = () => {
+    this.engine.onEnded = () => {
       this._setPlayIcon(false);
       this.$.currentTime.textContent = '00:00';
       this.$.seekBar.value = 0;
+      this._stopVizLoop();
     };
-    this.manager.onStateChange = (state) => {
+    this.engine.onStateChange = (state) => {
       this._setPlayIcon(state === 'playing');
+      if (state === 'playing') this._startVizLoop();
+      else this._stopVizLoop();
     };
   }
 
@@ -261,7 +290,7 @@ class App {
 
   async _handleFile(file) {
     if (!isSupportedFormat(file.name)) {
-      this._toast('error', 'فرمت پشتیبانی نمی‌شود', 'فقط MP3، WAV، OGG یا M4A');
+      this._toast('error', 'فرمت پشتیبانی نمی‌شود', 'فرمت‌های مجاز: MP3، WAV، OGG، M4A، WebM، FLAC');
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
@@ -269,21 +298,25 @@ class App {
       return;
     }
 
-    this._showOverlay('در حال بارگذاری...');
+    this._showOverlay('در حال بارگذاری و رمزگشایی...');
     try {
-      const info = await this.manager.loadFile(file);
+      // Resume context early on user gesture (file pick is a gesture)
+      await this.engine.ctxManager.ensure();
+      const info = await this.engine.loadFile(file);
       this._hideOverlay();
 
       this.$.uploadZone.classList.add('has-file');
       this.$.fileName.textContent = info.name;
       this.$.fileSize.textContent = formatFileSize(info.size);
       this.$.fileDuration.textContent = formatDuration(info.duration);
-      this.$.fileFormat.textContent = (file.name.split('.').pop() || '').toUpperCase();
+      this.$.fileFormat.textContent =
+        `${(file.name.split('.').pop() || '').toUpperCase()} · ${info.sampleRate} Hz · ${info.channels}ch`;
 
       this.$.playerPanel.classList.add('visible');
       this.$.effectsWorkspace.classList.add('visible');
       this.$.chainBar.classList.add('visible');
       this.$.actionBar.classList.add('visible');
+      this._populateExportFormats();
 
       this.$.totalTime.textContent = formatDuration(info.duration);
       this.$.seekBar.max = info.duration;
@@ -291,24 +324,33 @@ class App {
       this.$.currentTime.textContent = '00:00';
 
       this._resetEffects(true);
-      this._toast('success', 'آماده', `${info.name} بارگذاری شد`);
+      this._toast('success', 'آماده پخش', info.name);
+
+      if (window.location.search.includes('debug')) {
+        console.log('[Diagnostics]', this.engine.getDiagnostics());
+      }
     } catch (err) {
       this._hideOverlay();
-      this._toast('error', 'خطا', err.message === 'DECODE_FAILED'
-        ? 'فایل خراب است یا قابل خواندن نیست'
-        : 'بارگذاری ناموفق بود');
+      const messages = {
+        UNSUPPORTED_FORMAT: 'این فرمت پشتیبانی نمی‌شود',
+        DECODE_FAILED: 'فایل خراب است یا مرورگر نمی‌تواند آن را بخواند',
+        READ_FAILED: 'خواندن فایل ناموفق بود',
+        EMPTY_FILE: 'فایل خالی است'
+      };
+      this._toast('error', 'خطا', messages[err.message] || 'بارگذاری ناموفق بود');
       console.error(err);
     }
   }
 
-  _removeFile() {
-    this.manager.dispose();
-    this.manager = new AudioManager();
-    this._setupManager();
+  async _removeFile() {
+    await this.engine.dispose();
+    this.engine = new AudioEngine();
+    this._wireEngine();
     this._initEffectState();
     this.selectedEffect = null;
     this._renderSidebar();
     this._showControlsEmpty();
+    this._stopVizLoop();
 
     this.$.uploadZone.classList.remove('has-file');
     this.$.playerPanel.classList.remove('visible');
@@ -319,14 +361,8 @@ class App {
     this._setPlayIcon(false);
   }
 
-  _togglePlay() {
-    if (!this.manager.originalBuffer) return;
-    if (this.manager.isPlaying) this.manager.pause();
-    else this.manager.play();
-  }
-
   _setMode(mode) {
-    this.manager.setPreviewMode(mode);
+    this.engine.setPreviewMode(mode);
     this.$.modeOriginal.classList.toggle('active', mode === 'original');
     this.$.modeProcessed.classList.toggle('active', mode === 'processed');
   }
@@ -337,8 +373,7 @@ class App {
     if (item) item.classList.toggle('active-fx', enabled);
     this._syncEffects();
     this._updateChain();
-    // If selecting and enabling, show controls
-    if (enabled && this.selectedEffect !== id) this._selectEffect(id);
+    if (enabled) this._selectEffect(id);
     else if (this.selectedEffect === id) this._renderControls(id);
   }
 
@@ -352,114 +387,135 @@ class App {
 
   _renderControls(id) {
     const meta = effectsRegistry[id].meta;
-    const params = this.effectState[id].params;
+    const p = this.effectState[id].params;
     this.$.controlsEmpty.style.display = 'none';
     this.$.controlsContent.style.display = 'block';
 
     let body = `
       <div class="controls-header">
         <div class="fx-icon">${ICONS[meta.icon] || ''}</div>
-        <div>
-          <h3>${meta.name}</h3>
-          <p>${meta.description}</p>
-        </div>
-      </div>
-    `;
+        <div><h3>${meta.name}</h3><p>${meta.description}</p></div>
+      </div>`;
 
     if (id === 'femaleVoice') {
       body += this._chips(id, 'mode', 'حالت', [
         { v: 'girl', l: 'دخترانه' }, { v: 'woman', l: 'زنانه' }
-      ], params.mode);
-      body += this._slider(id, 'intensity', 'شدت', 0, 100, params.intensity * 100, 0.01, '%');
+      ], p.mode);
+      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.75) * 100, 0.01);
     } else if (id === 'deepVoice') {
-      body += this._slider(id, 'intensity', 'شدت', 0, 100, params.intensity * 100, 0.01, '%');
+      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.7) * 100, 0.01);
     } else if (id === 'autotune') {
-      body += this._chips(id, 'key', 'کلید (Key)', NOTE_NAMES.map(n => ({ v: n, l: n })), params.key);
-      body += this._chips(id, 'scale', 'گام (Scale)', [
+      body += this._chips(id, 'style', 'سبک موسیقی', [
+        { v: 'pop', l: 'پاپ' }, { v: 'traditional', l: 'سنتی' },
+        { v: 'rock', l: 'راک' }, { v: 'metal', l: 'متال' }, { v: 'rap', l: 'رپ' }
+      ], p.style || 'pop');
+      body += this._chips(id, 'autoMode', 'حالت خودکار', [
+        { v: 'true', l: 'خودکار (Auto)' }, { v: 'false', l: 'دستی' }
+      ], p.autoMode ? 'true' : 'false');
+      if (p.detectedKey) {
+        body += `<div class="control-row"><div class="control-label">
+          <span>تشخیص‌شده: ${p.detectedKey} ${p.detectedScale === 'minor' ? 'مینور' : 'ماژور'}</span>
+          <span class="val">اطمینان ${p.confidence || 0}٪</span>
+        </div></div>`;
+      }
+      body += this._chips(id, 'key', 'کلید', NOTE_NAMES.map(n => ({ v: n, l: n })), p.key);
+      body += this._chips(id, 'scale', 'گام', [
         { v: 'major', l: 'ماژور' }, { v: 'minor', l: 'مینور' }, { v: 'chromatic', l: 'کروماتیک' }
-      ], params.scale);
-      body += this._slider(id, 'amount', 'میزان تصحیح', 0, 100, params.amount * 100, 0.01, '%');
-      body += this._slider(id, 'retuneSpeed', 'سرعت Retune', 0, 100, params.retuneSpeed * 100, 0.01, '%');
-      body += this._slider(id, 'humanize', 'انسانی‌سازی', 0, 100, params.humanize * 100, 0.01, '%');
-      body += this._slider(id, 'mix', 'مخلوط', 0, 100, params.mix * 100, 0.01, '%');
+      ], p.scale);
+      body += this._slider(id, 'amount', 'میزان تصحیح', 0, 100, (p.amount ?? 0.7) * 100, 0.01);
+      body += this._slider(id, 'retuneSpeed', 'سرعت Retune', 0, 100, (p.retuneSpeed ?? 0.55) * 100, 0.01);
+      body += this._slider(id, 'humanize', 'انسانی‌سازی', 0, 100, (p.humanize ?? 0.25) * 100, 0.01);
+      body += this._slider(id, 'mix', 'مخلوط', 0, 100, (p.mix ?? 0.85) * 100, 0.01);
+      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 1) * 100, 0.01);
     } else if (id === 'echo') {
-      body += this._slider(id, 'delay', 'تأخیر', 5, 100, params.delay * 100, 0.01, 's', v => (v).toFixed(2) + 's');
-      body += this._slider(id, 'feedback', 'بازخورد', 0, 80, params.feedback * 100, 0.01, '%');
-      body += this._slider(id, 'mix', 'مخلوط', 0, 100, params.mix * 100, 0.01, '%');
+      body += this._slider(id, 'delay', 'تأخیر', 5, 100, (p.delay ?? 0.28) * 100, 0.01, 's');
+      body += this._slider(id, 'feedback', 'بازخورد', 0, 80, (p.feedback ?? 0.4) * 100, 0.01);
+      body += this._slider(id, 'mix', 'مخلوط', 0, 100, (p.mix ?? 0.45) * 100, 0.01);
     } else if (id === 'studio') {
-      body += this._slider(id, 'roomSize', 'اندازه فضا', 10, 100, params.roomSize * 100, 0.01, '%');
-      body += this._slider(id, 'wet', 'میزان ریورب', 5, 60, params.wet * 100, 0.01, '%');
-      body += this._slider(id, 'intensity', 'شدت', 20, 100, params.intensity * 100, 0.01, '%');
+      body += this._slider(id, 'roomSize', 'اندازه فضا', 10, 100, (p.roomSize ?? 0.5) * 100, 0.01);
+      body += this._slider(id, 'wet', 'میزان ریورب', 5, 60, (p.wet ?? 0.32) * 100, 0.01);
+      body += this._slider(id, 'intensity', 'شدت فیلتر', 20, 100, (p.intensity ?? 0.65) * 100, 0.01);
     } else if (id === 'bassBoost') {
-      body += this._slider(id, 'amount', 'مقدار بیس', 0, 15, params.amount, 1, 'dB', v => v + ' dB');
-      body += this._slider(id, 'frequency', 'فرکانس', 60, 200, params.frequency, 1, 'Hz', v => v + ' Hz');
+      body += this._slider(id, 'amount', 'مقدار بیس', 0, 15, p.amount ?? 8, 1, 'dB');
+      body += this._slider(id, 'frequency', 'فرکانس', 60, 200, p.frequency ?? 95, 1, 'Hz');
     } else if (id === 'volume') {
-      body += this._slider(id, 'gain', 'بلندی', 10, 300, params.gain * 100, 0.01, '%');
+      body += this._slider(id, 'gain', 'بلندی', 10, 300, (p.gain ?? 1) * 100, 0.01);
+    } else if (id === 'noiseReduction') {
+      body += this._slider(id, 'strength', 'قدرت کاهش', 0, 100, (p.strength ?? 0.55) * 100, 0.01);
+      body += this._slider(id, 'sensitivity', 'حساسیت', 0, 100, (p.sensitivity ?? 0.5) * 100, 0.01);
+      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.7) * 100, 0.01);
     } else {
-      // speaker, police, improveQuality
-      body += this._slider(id, 'intensity', 'شدت', 0, 100, params.intensity * 100, 0.01, '%');
+      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.7) * 100, 0.01);
     }
 
     this.$.controlsContent.innerHTML = body;
   }
 
-  _slider(id, param, label, min, max, value, scale, unit, fmt) {
-    const display = fmt ? fmt(value * (scale < 1 ? scale : 1) === value ? value : value) : (
-      unit === '%' ? Math.round(value) + '%' :
-      unit === 'dB' ? value + ' dB' :
-      unit === 'Hz' ? value + ' Hz' :
-      unit === 's' ? (value / 100).toFixed(2) + 's' : value
-    );
-    // Simpler display
+  _slider(id, param, label, min, max, value, scale, unit) {
     let disp;
-    if (unit === '%') disp = Math.round(value) + '%';
-    else if (unit === 'dB') disp = value + ' dB';
+    if (unit === 'dB') disp = value + ' dB';
     else if (unit === 'Hz') disp = value + ' Hz';
-    else if (unit === 's') disp = (value * scale).toFixed(2) + 's';
-    else disp = value;
+    else if (unit === 's') disp = (value * scale).toFixed(2) + ' ثانیه';
+    else disp = Math.round(value) + '٪';
 
-    return `
-      <div class="control-row">
-        <div class="control-label"><span>${label}</span><span class="val" data-value-display="${param}">${disp}</span></div>
-        <input type="range" min="${min}" max="${max}" value="${value}" data-param="${param}" data-effect="${id}" data-scale="${scale}" aria-label="${label}">
-      </div>
-    `;
+    return `<div class="control-row">
+      <div class="control-label"><span>${label}</span><span class="val" data-value-display="${param}">${disp}</span></div>
+      <input type="range" min="${min}" max="${max}" value="${value}"
+        data-param="${param}" data-effect="${id}" data-scale="${scale}" aria-label="${label}">
+    </div>`;
   }
 
   _chips(id, param, label, options, current) {
     const chips = options.map(o =>
-      `<button type="button" class="option-chip ${o.v === current ? 'active' : ''}" data-effect="${id}" data-param="${param}" data-value="${o.v}">${o.l}</button>`
+      `<button type="button" class="option-chip ${String(o.v) === String(current) ? 'active' : ''}"
+        data-effect="${id}" data-param="${param}" data-value="${o.v}">${o.l}</button>`
     ).join('');
-    return `
-      <div class="control-row">
-        <div class="control-label"><span>${label}</span></div>
-        <div class="option-group">${chips}</div>
-      </div>
-    `;
+    return `<div class="control-row">
+      <div class="control-label"><span>${label}</span></div>
+      <div class="option-group">${chips}</div>
+    </div>`;
   }
 
-  _updateValDisplay(input, param, value) {
-    const row = input.closest('.control-row');
-    const el = row?.querySelector(`[data-value-display="${param}"]`);
+  _updateValLabel(input, param, value) {
+    const el = input.closest('.control-row')?.querySelector(`[data-value-display="${param}"]`);
     if (!el) return;
-    if (param === 'intensity' || param === 'feedback' || param === 'mix' || param === 'roomSize' || param === 'wet' || param === 'amount' && value <= 1 || param === 'retuneSpeed' || param === 'humanize' || param === 'gain') {
-      el.textContent = Math.round(value * 100) / (param === 'amount' && value > 1 ? 1 : 1);
-      // fix
-      if (['intensity','feedback','mix','roomSize','wet','retuneSpeed','humanize'].includes(param) || (param === 'amount' && value <= 1) || param === 'gain') {
-        el.textContent = Math.round(value * 100) + '%';
-      } else if (param === 'amount') {
-        el.textContent = value + ' dB';
-      } else if (param === 'frequency') {
-        el.textContent = value + ' Hz';
-      } else if (param === 'delay') {
-        el.textContent = value.toFixed(2) + 's';
-      }
-    } else if (param === 'delay') {
-      el.textContent = value.toFixed(2) + 's';
-    } else if (param === 'amount') {
-      el.textContent = value + ' dB';
-    } else if (param === 'frequency') {
-      el.textContent = value + ' Hz';
+    if (param === 'delay') el.textContent = value.toFixed(2) + ' ثانیه';
+    else if (param === 'amount' && value > 1) el.textContent = value + ' dB';
+    else if (param === 'frequency') el.textContent = value + ' Hz';
+    else el.textContent = Math.round(value * 100) + '٪';
+  }
+
+  async _runAutoDetect(id) {
+    if (!this.engine.originalBuffer) return;
+    this._showOverlay('در حال تشخیص Key و Scale...');
+    try {
+      // Yield to UI
+      await new Promise(r => setTimeout(r, 50));
+      const result = detectKeyAndScale(this.engine.originalBuffer);
+      this.effectState[id].params.key = result.key;
+      this.effectState[id].params.scale = result.scale;
+      this.effectState[id].params.detectedKey = result.key;
+      this.effectState[id].params.detectedScale = result.scale;
+      this.effectState[id].params.confidence = result.confidence;
+      // also apply style defaults
+      const style = this.effectState[id].params.style || 'pop';
+      Object.assign(this.effectState[id].params, applyStylePreset(style), {
+        key: result.key,
+        scale: result.scale,
+        detectedKey: result.key,
+        detectedScale: result.scale,
+        confidence: result.confidence,
+        autoMode: true
+      });
+      this._hideOverlay();
+      this._renderControls(id);
+      this._syncEffects();
+      this._toast('success', 'تشخیص انجام شد',
+        `کلید: ${result.key} · اطمینان: ${result.confidence}٪`);
+    } catch (err) {
+      this._hideOverlay();
+      this._toast('error', 'خطا', 'تشخیص خودکار ناموفق بود');
+      console.error(err);
     }
   }
 
@@ -475,13 +531,13 @@ class App {
       params: { ...this.effectState[id].params },
       enabled: this.effectState[id].enabled
     }));
-    this.manager.setActiveEffects(list);
+    this.engine.setEffects(list);
     this._updateChain();
   }
 
   _updateChain() {
     const active = effectOrder.filter(id => this.effectState[id]?.enabled);
-    if (active.length === 0) {
+    if (!active.length) {
       this.$.chainFlow.innerHTML = '<span class="chain-empty-msg">هیچ افکتی فعال نیست</span>';
       return;
     }
@@ -490,48 +546,53 @@ class App {
       const arrow = i < active.length - 1 ? '<span class="chain-arrow">←</span>' : '';
       return `<span class="chain-chip">${name}<span class="x" data-rm="${id}">×</span></span>${arrow}`;
     }).join('');
-
     this.$.chainFlow.querySelectorAll('[data-rm]').forEach(el => {
       el.addEventListener('click', () => {
         const id = el.dataset.rm;
         this.effectState[id].enabled = false;
         const cb = this.$.effectsSidebar.querySelector(`[data-toggle="${id}"]`);
         if (cb) cb.checked = false;
-        const item = this.$.effectsSidebar.querySelector(`[data-id="${id}"]`);
-        if (item) item.classList.remove('active-fx');
+        this.$.effectsSidebar.querySelector(`[data-id="${id}"]`)?.classList.remove('active-fx');
         this._syncEffects();
       });
     });
   }
 
   _resetEffects(silent = false) {
-    this.manager.reset();
+    this.engine.reset();
     this._initEffectState();
     this.selectedEffect = null;
     this._renderSidebar();
     this._showControlsEmpty();
     this._updateChain();
     this._setMode('processed');
-    if (!silent) this._toast('success', 'بازنشانی', 'همه افکت‌ها غیرفعال شدند');
+    if (!silent) this._toast('success', 'بازنشانی شد', 'همه افکت‌ها خاموش شدند');
   }
 
   async _export() {
-    if (!this.manager.originalBuffer || this.isProcessing) return;
+    if (!this.engine.originalBuffer || this.isProcessing) return;
     this.isProcessing = true;
     this.$.btnExport.disabled = true;
     this.$.btnReset.disabled = true;
-    this._showOverlay('در حال رندر خروجی...');
+    this._showOverlay('شروع پردازش...');
+
+    const format = this.$.exportFormat?.value || 'wav';
+    const channels = parseInt(this.$.exportChannels?.value || '2', 10);
+    const sr = parseInt(this.$.exportSampleRate?.value || '0', 10);
 
     try {
-      const name = await this.manager.exportWav(p => {
-        this.$.progressFill.style.width = Math.round(p * 100) + '%';
-        this.$.overlayText.textContent = `رندر خروجی... ${Math.round(p * 100)}%`;
-      });
+      const name = await this.engine.export(
+        { format, channels, sampleRate: sr || undefined },
+        (p, label) => {
+          this.$.progressFill.style.width = Math.round(p * 100) + '%';
+          this.$.overlayText.textContent = label || `پردازش... ${Math.round(p * 100)}٪`;
+        }
+      );
       this._hideOverlay();
-      this._toast('success', 'دانلود شد', name);
+      this._toast('success', 'پردازش با موفقیت انجام شد', name);
     } catch (err) {
       this._hideOverlay();
-      this._toast('error', 'خطا در خروجی', 'پردازش ناموفق بود. دوباره تلاش کنید.');
+      this._toast('error', 'خطا در خروجی', 'پردازش یا ساخت فایل ناموفق بود');
       console.error(err);
     } finally {
       this.isProcessing = false;
@@ -540,45 +601,88 @@ class App {
     }
   }
 
-  _drawViz() {
+  /* ── Fluid Wave Visualizer ── */
+  _startVizLoop() {
+    this._stopVizLoop();
     const canvas = this.$.vizCanvas;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const data = this.manager.getAnalyserData();
-    if (!data) return;
+    const bins = 128;
+    if (!this._smoothedWave) this._smoothedWave = new Float32Array(bins);
 
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      ctx.scale(dpr, dpr);
+    const draw = () => {
+      if (!this.engine.isPlaying) return;
+      const data = this.engine.getAnalyserTimeData();
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      const theme = document.documentElement.getAttribute('data-theme');
+      ctx.fillStyle = theme === 'light' ? '#f0f4f8' : '#0b1220';
+      ctx.fillRect(0, 0, w, h);
+
+      if (data) {
+        // Downsample + smooth
+        const step = Math.floor(data.length / bins);
+        for (let i = 0; i < bins; i++) {
+          const v = (data[i * step] - 128) / 128;
+          this._smoothedWave[i] += (v - this._smoothedWave[i]) * 0.35;
+        }
+      }
+
+      // Organic bezier wave
+      ctx.beginPath();
+      ctx.strokeStyle = theme === 'light' ? '#2563eb' : '#60a5fa';
+      ctx.lineWidth = 2.2;
+      ctx.lineJoin = 'round';
+
+      const mid = h / 2;
+      for (let i = 0; i < bins; i++) {
+        const x = (i / (bins - 1)) * w;
+        const y = mid + this._smoothedWave[i] * mid * 0.85;
+        if (i === 0) ctx.moveTo(x, y);
+        else {
+          const prevX = ((i - 1) / (bins - 1)) * w;
+          const cpx = (prevX + x) / 2;
+          ctx.quadraticCurveTo(prevX, mid + this._smoothedWave[i - 1] * mid * 0.85, cpx, y);
+        }
+      }
+      ctx.stroke();
+
+      // Soft fill
+      ctx.lineTo(w, mid);
+      ctx.lineTo(0, mid);
+      ctx.closePath();
+      ctx.fillStyle = theme === 'light' ? 'rgba(37,99,235,0.08)' : 'rgba(96,165,250,0.1)';
+      ctx.fill();
+
+      this._vizRaf = requestAnimationFrame(draw);
+    };
+    this._vizRaf = requestAnimationFrame(draw);
+  }
+
+  _stopVizLoop() {
+    if (this._vizRaf) {
+      cancelAnimationFrame(this._vizRaf);
+      this._vizRaf = null;
     }
-
-    const theme = document.documentElement.getAttribute('data-theme');
-    ctx.fillStyle = theme === 'light' ? '#f0f4f8' : '#0b1220';
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = theme === 'light' ? '#2563eb' : '#3b82f6';
-    ctx.beginPath();
-    const slice = w / data.length;
-    let x = 0;
-    for (let i = 0; i < data.length; i++) {
-      const v = data[i] / 128.0;
-      const y = (v * h) / 2;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-      x += slice;
+    // Gentle decay draw once
+    if (this._smoothedWave) {
+      for (let i = 0; i < this._smoothedWave.length; i++) {
+        this._smoothedWave[i] *= 0.5;
+      }
     }
-    ctx.stroke();
   }
 
   _showOverlay(text) {
     this.$.overlay.classList.add('visible');
     this.$.overlayText.textContent = text || 'در حال پردازش...';
-    this.$.progressFill.style.width = '8%';
+    this.$.progressFill.style.width = '6%';
   }
 
   _hideOverlay() {
@@ -589,13 +693,9 @@ class App {
   _toast(type, title, msg) {
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.innerHTML = `
-      <div class="toast-body">
-        <div class="toast-title">${title}</div>
-        <div class="toast-msg">${msg}</div>
-      </div>
-      <button class="toast-close" aria-label="بستن">×</button>
-    `;
+    el.innerHTML = `<div class="toast-body"><div class="toast-title">${title}</div>
+      <div class="toast-msg">${msg}</div></div>
+      <button class="toast-close" aria-label="بستن">×</button>`;
     el.querySelector('.toast-close').addEventListener('click', () => el.remove());
     this.$.toastBox.appendChild(el);
     setTimeout(() => el.parentNode && el.remove(), 5000);
