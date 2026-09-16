@@ -1,364 +1,302 @@
 /**
- * Audio Editor V1.01 – Main Application
+ * Audio Editor V1.02 – Application
  */
 
 import { AudioManager } from './audio/audioManager.js';
 import { effectsRegistry, effectOrder } from './effects/index.js';
-import {
-  formatDuration,
-  formatFileSize,
-  isSupportedFormat,
-  debounce
-} from './utils/helpers.js';
+import { formatDuration, formatFileSize, isSupportedFormat, debounce, NOTE_NAMES } from './utils/helpers.js';
 
-const MAX_FILE_SIZE = 80 * 1024 * 1024; // 80 MB soft limit
+const MAX_FILE_SIZE = 80 * 1024 * 1024;
+
+const ICONS = {
+  female: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M12 12v8M9 18h6"/></svg>',
+  deep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="7" r="3.5"/><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M12 14v3"/></svg>',
+  autotune: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M12 9l2 2 4-4"/></svg>',
+  speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1"/></svg>',
+  police: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L4 6v5c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V6l-8-4z"/><path d="M9 12l2 2 4-4"/></svg>',
+  echo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h4M6 8v8M10 5v14M14 8v8M18 10v4M22 12h0"/></svg>',
+  studio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a5 5 0 0 1 5 5v4a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4M8 22h8"/></svg>',
+  bass: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 18c2-4 4-6 6-6s4 2 6 6 4 6 6 6"/><path d="M3 12h18"/></svg>',
+  quality: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>',
+  volume: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>'
+};
+
+const CATEGORIES = {
+  voice: 'صدا',
+  environment: 'محیط',
+  enhancement: 'بهبود'
+};
 
 class App {
   constructor() {
     this.manager = new AudioManager();
-    this.effectState = {}; // id -> { enabled, params }
+    this.effectState = {};
+    this.selectedEffect = null;
     this.isProcessing = false;
+    this.isSeeking = false;
 
-    this.els = {};
-    this._bindElements();
+    this._initTheme();
     this._initEffectState();
-    this._renderEffectCards();
+    this._cacheDom();
+    this._renderSidebar();
     this._bindEvents();
-    this._setupManagerCallbacks();
+    this._setupManager();
   }
 
-  _bindElements() {
-    this.els = {
-      uploadSection: document.getElementById('uploadSection'),
+  _cacheDom() {
+    this.$ = {
+      uploadZone: document.getElementById('uploadZone'),
       fileInput: document.getElementById('fileInput'),
-      fileInfo: document.getElementById('fileInfo'),
       fileName: document.getElementById('fileName'),
       fileSize: document.getElementById('fileSize'),
       fileDuration: document.getElementById('fileDuration'),
       fileFormat: document.getElementById('fileFormat'),
-      btnRemoveFile: document.getElementById('btnRemoveFile'),
+      btnPickFile: document.getElementById('btnPickFile'),
       btnChangeFile: document.getElementById('btnChangeFile'),
-
-      playerSection: document.getElementById('playerSection'),
+      btnRemoveFile: document.getElementById('btnRemoveFile'),
+      playerPanel: document.getElementById('playerPanel'),
       playBtn: document.getElementById('playBtn'),
+      playIcon: document.getElementById('playIcon'),
       currentTime: document.getElementById('currentTime'),
       totalTime: document.getElementById('totalTime'),
       seekBar: document.getElementById('seekBar'),
-      volumeSlider: document.getElementById('volumeSlider'),
       modeOriginal: document.getElementById('modeOriginal'),
       modeProcessed: document.getElementById('modeProcessed'),
-      waveformCanvas: document.getElementById('waveformCanvas'),
-
-      effectsSection: document.getElementById('effectsSection'),
-      effectsGrid: document.getElementById('effectsGrid'),
-      chainSection: document.getElementById('chainSection'),
-      chainList: document.getElementById('chainList'),
-
-      actionsBar: document.getElementById('actionsBar'),
+      vizCanvas: document.getElementById('vizCanvas'),
+      effectsWorkspace: document.getElementById('effectsWorkspace'),
+      effectsSidebar: document.getElementById('effectsSidebar'),
+      controlsPanel: document.getElementById('controlsPanel'),
+      controlsEmpty: document.getElementById('controlsEmpty'),
+      controlsContent: document.getElementById('controlsContent'),
+      chainBar: document.getElementById('chainBar'),
+      chainFlow: document.getElementById('chainFlow'),
+      actionBar: document.getElementById('actionBar'),
       btnReset: document.getElementById('btnReset'),
       btnExport: document.getElementById('btnExport'),
-
-      progressOverlay: document.getElementById('progressOverlay'),
-      progressText: document.getElementById('progressText'),
-      progressBar: document.getElementById('progressBar'),
-      toastContainer: document.getElementById('toastContainer')
+      overlay: document.getElementById('overlay'),
+      overlayText: document.getElementById('overlayText'),
+      progressFill: document.getElementById('progressFill'),
+      toastBox: document.getElementById('toastBox'),
+      themeBtn: document.getElementById('themeBtn')
     };
+  }
+
+  _initTheme() {
+    const saved = localStorage.getItem('ae-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+
+  _toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('ae-theme', next);
   }
 
   _initEffectState() {
-    effectOrder.forEach((id) => {
+    effectOrder.forEach(id => {
       const meta = effectsRegistry[id].meta;
-      this.effectState[id] = {
-        enabled: false,
-        params: { ...meta.defaultParams }
-      };
+      this.effectState[id] = { enabled: false, params: { ...meta.defaultParams } };
     });
   }
 
-  _renderEffectCards() {
-    const grid = this.els.effectsGrid;
-    grid.innerHTML = '';
-
-    const categories = {
-      voice: 'افکت‌های صدا',
-      environment: 'افکت‌های محیطی',
-      enhancement: 'بهبود صدا'
-    };
-
-    let lastCat = null;
-
-    effectOrder.forEach((id) => {
-      const { meta } = effectsRegistry[id];
-      if (meta.category !== lastCat) {
-        lastCat = meta.category;
-        const header = document.createElement('div');
-        header.className = 'category-header';
-        header.textContent = categories[meta.category] || meta.category;
-        grid.appendChild(header);
-      }
-
-      const card = document.createElement('div');
-      card.className = 'effect-card';
-      card.dataset.effectId = id;
-
-      const state = this.effectState[id];
-
-      card.innerHTML = `
-        <div class="effect-header">
-          <div class="effect-title">
-            <div class="effect-icon">${meta.icon}</div>
-            <div>
-              <div class="effect-name">${meta.name}</div>
-              <div class="effect-desc">${meta.description}</div>
-            </div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" data-toggle="${id}" ${state.enabled ? 'checked' : ''}>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="effect-controls" data-controls="${id}">
-          ${this._renderControls(id, meta, state.params)}
-        </div>
-      `;
-
-      if (state.enabled) card.classList.add('active');
-      grid.appendChild(card);
-    });
-  }
-
-  _renderControls(id, meta, params) {
-    let html = '';
-
-    if (id === 'femaleVoice') {
-      html += `
-        <div class="control-group">
-          <div class="control-label"><span>حالت</span></div>
-          <div class="mode-select">
-            <button type="button" class="mode-option ${params.mode === 'girl' ? 'active' : ''}" data-param="mode" data-value="girl" data-effect="${id}">دخترانه</button>
-            <button type="button" class="mode-option ${params.mode === 'woman' ? 'active' : ''}" data-param="mode" data-value="woman" data-effect="${id}">زنانه</button>
-          </div>
-        </div>
-        <div class="control-group">
-          <div class="control-label"><span>شدت</span><span class="value" data-value-display="intensity">${Math.round(params.intensity * 100)}%</span></div>
-          <input type="range" min="0" max="100" value="${params.intensity * 100}" data-param="intensity" data-effect="${id}" data-scale="0.01">
-        </div>
-      `;
-    } else if (id === 'deepVoice') {
-      html += `
-        <div class="control-group">
-          <div class="control-label"><span>شدت</span><span class="value" data-value-display="intensity">${Math.round(params.intensity * 100)}%</span></div>
-          <input type="range" min="0" max="100" value="${params.intensity * 100}" data-param="intensity" data-effect="${id}" data-scale="0.01">
-        </div>
-      `;
-    } else if (id === 'echo') {
-      html += `
-        <div class="control-group">
-          <div class="control-label"><span>تأخیر (Delay)</span><span class="value" data-value-display="delay">${params.delay.toFixed(2)}s</span></div>
-          <input type="range" min="5" max="100" value="${params.delay * 100}" data-param="delay" data-effect="${id}" data-scale="0.01">
-        </div>
-        <div class="control-group">
-          <div class="control-label"><span>بازخورد (Feedback)</span><span class="value" data-value-display="feedback">${Math.round(params.feedback * 100)}%</span></div>
-          <input type="range" min="0" max="80" value="${params.feedback * 100}" data-param="feedback" data-effect="${id}" data-scale="0.01">
-        </div>
-        <div class="control-group">
-          <div class="control-label"><span>مخلوط (Mix)</span><span class="value" data-value-display="mix">${Math.round(params.mix * 100)}%</span></div>
-          <input type="range" min="0" max="100" value="${params.mix * 100}" data-param="mix" data-effect="${id}" data-scale="0.01">
-        </div>
-      `;
-    } else if (id === 'studio') {
-      html += `
-        <div class="control-group">
-          <div class="control-label"><span>اندازه فضا</span><span class="value" data-value-display="roomSize">${Math.round(params.roomSize * 100)}%</span></div>
-          <input type="range" min="10" max="100" value="${params.roomSize * 100}" data-param="roomSize" data-effect="${id}" data-scale="0.01">
-        </div>
-        <div class="control-group">
-          <div class="control-label"><span>میزان ریورب</span><span class="value" data-value-display="wet">${Math.round(params.wet * 100)}%</span></div>
-          <input type="range" min="5" max="60" value="${params.wet * 100}" data-param="wet" data-effect="${id}" data-scale="0.01">
-        </div>
-        <div class="control-group">
-          <div class="control-label"><span>شدت کلی</span><span class="value" data-value-display="intensity">${Math.round(params.intensity * 100)}%</span></div>
-          <input type="range" min="20" max="100" value="${params.intensity * 100}" data-param="intensity" data-effect="${id}" data-scale="0.01">
-        </div>
-      `;
-    } else if (id === 'bassBoost') {
-      html += `
-        <div class="control-group">
-          <div class="control-label"><span>مقدار بیس (dB)</span><span class="value" data-value-display="amount">${params.amount} dB</span></div>
-          <input type="range" min="0" max="15" value="${params.amount}" data-param="amount" data-effect="${id}" data-scale="1">
-        </div>
-        <div class="control-group">
-          <div class="control-label"><span>فرکانس مرکزی</span><span class="value" data-value-display="frequency">${params.frequency} Hz</span></div>
-          <input type="range" min="60" max="200" value="${params.frequency}" data-param="frequency" data-effect="${id}" data-scale="1">
-        </div>
-      `;
-    } else if (id === 'volume') {
-      const pct = Math.round(params.gain * 100);
-      html += `
-        <div class="control-group">
-          <div class="control-label"><span>بلندی</span><span class="value" data-value-display="gain">${pct}%</span></div>
-          <input type="range" min="10" max="300" value="${pct}" data-param="gain" data-effect="${id}" data-scale="0.01">
-        </div>
-      `;
-    } else if (id === 'speaker' || id === 'police' || id === 'improveQuality') {
-      html += `
-        <div class="control-group">
-          <div class="control-label"><span>شدت</span><span class="value" data-value-display="intensity">${Math.round(params.intensity * 100)}%</span></div>
-          <input type="range" min="0" max="100" value="${params.intensity * 100}" data-param="intensity" data-effect="${id}" data-scale="0.01">
-        </div>
-      `;
+  _renderSidebar() {
+    const sidebar = this.$.effectsSidebar;
+    // Keep title
+    const title = sidebar.querySelector('.sidebar-title');
+    sidebar.innerHTML = '';
+    if (title) sidebar.appendChild(title);
+    else {
+      const t = document.createElement('div');
+      t.className = 'sidebar-title';
+      t.textContent = 'افکت‌ها';
+      sidebar.appendChild(t);
     }
 
-    return html;
+    let lastCat = null;
+    effectOrder.forEach(id => {
+      const meta = effectsRegistry[id].meta;
+      if (meta.category !== lastCat) {
+        lastCat = meta.category;
+        const lab = document.createElement('div');
+        lab.className = 'effect-cat-label';
+        lab.textContent = CATEGORIES[meta.category] || meta.category;
+        sidebar.appendChild(lab);
+      }
+
+      const item = document.createElement('div');
+      item.className = 'effect-item';
+      item.dataset.id = id;
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
+      item.innerHTML = `
+        <div class="fx-icon">${ICONS[meta.icon] || ICONS.quality}</div>
+        <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
+        <label class="fx-toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" data-toggle="${id}">
+          <span class="fx-toggle-track"></span>
+        </label>
+      `;
+      sidebar.appendChild(item);
+    });
   }
 
   _bindEvents() {
-    // Upload
-    this.els.uploadSection.addEventListener('click', (e) => {
-      if (e.target.closest('.file-info') || e.target.closest('.btn')) return;
-      this.els.fileInput.click();
+    this.$.themeBtn.addEventListener('click', () => this._toggleTheme());
+
+    this.$.btnPickFile.addEventListener('click', (e) => { e.stopPropagation(); this.$.fileInput.click(); });
+    this.$.uploadZone.addEventListener('click', (e) => {
+      if (this.$.uploadZone.classList.contains('has-file')) return;
+      if (e.target.closest('button')) return;
+      this.$.fileInput.click();
+    });
+    this.$.fileInput.addEventListener('change', e => {
+      const f = e.target.files?.[0];
+      if (f) this._handleFile(f);
     });
 
-    this.els.fileInput.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (file) this._handleFile(file);
+    ['dragenter', 'dragover'].forEach(ev => {
+      this.$.uploadZone.addEventListener(ev, e => { e.preventDefault(); this.$.uploadZone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(ev => {
+      this.$.uploadZone.addEventListener(ev, e => { e.preventDefault(); this.$.uploadZone.classList.remove('dragover'); });
+    });
+    this.$.uploadZone.addEventListener('drop', e => {
+      const f = e.dataTransfer?.files?.[0];
+      if (f) this._handleFile(f);
     });
 
-    // Drag & drop
-    ['dragenter', 'dragover'].forEach((ev) => {
-      this.els.uploadSection.addEventListener(ev, (e) => {
-        e.preventDefault();
-        this.els.uploadSection.classList.add('dragover');
-      });
+    this.$.btnChangeFile.addEventListener('click', () => this.$.fileInput.click());
+    this.$.btnRemoveFile.addEventListener('click', () => this._removeFile());
+
+    this.$.playBtn.addEventListener('click', () => this._togglePlay());
+
+    this.$.seekBar.addEventListener('pointerdown', () => { this.isSeeking = true; });
+    this.$.seekBar.addEventListener('pointerup', () => {
+      this.isSeeking = false;
+      this.manager.seek(parseFloat(this.$.seekBar.value));
     });
-    ['dragleave', 'drop'].forEach((ev) => {
-      this.els.uploadSection.addEventListener(ev, (e) => {
-        e.preventDefault();
-        this.els.uploadSection.classList.remove('dragover');
-      });
+    this.$.seekBar.addEventListener('input', () => {
+      const t = parseFloat(this.$.seekBar.value);
+      this.$.currentTime.textContent = formatDuration(t);
     });
-    this.els.uploadSection.addEventListener('drop', (e) => {
-      const file = e.dataTransfer?.files?.[0];
-      if (file) this._handleFile(file);
+    this.$.seekBar.addEventListener('change', () => {
+      this.isSeeking = false;
+      this.manager.seek(parseFloat(this.$.seekBar.value));
     });
 
-    this.els.btnRemoveFile?.addEventListener('click', () => this._removeFile());
-    this.els.btnChangeFile?.addEventListener('click', () => this.els.fileInput.click());
+    this.$.modeOriginal.addEventListener('click', () => this._setMode('original'));
+    this.$.modeProcessed.addEventListener('click', () => this._setMode('processed'));
 
-    // Player
-    this.els.playBtn.addEventListener('click', () => this._togglePlay());
-    this.els.seekBar.addEventListener('input', (e) => {
-      const t = parseFloat(e.target.value);
-      this.manager.seek(t);
-      this.els.currentTime.textContent = formatDuration(t);
-    });
-    this.els.volumeSlider.addEventListener('input', (e) => {
-      // Master volume is handled via a simple gain; for simplicity we store it
-      // and rebuild is not needed – we can attach a separate gain later if wanted.
-      // For V1 we just keep it visual; actual volume control via Volume effect.
-    });
-
-    this.els.modeOriginal.addEventListener('click', () => this._setMode('original'));
-    this.els.modeProcessed.addEventListener('click', () => this._setMode('processed'));
-
-    // Effects – event delegation
-    this.els.effectsGrid.addEventListener('change', (e) => {
+    // Sidebar: select effect / toggle
+    this.$.effectsSidebar.addEventListener('click', e => {
       const toggle = e.target.closest('[data-toggle]');
       if (toggle) {
         const id = toggle.dataset.toggle;
         this._toggleEffect(id, toggle.checked);
+        return;
+      }
+      const item = e.target.closest('.effect-item');
+      if (item) this._selectEffect(item.dataset.id);
+    });
+
+    this.$.effectsSidebar.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const item = e.target.closest('.effect-item');
+        if (item) { e.preventDefault(); this._selectEffect(item.dataset.id); }
       }
     });
 
-    this.els.effectsGrid.addEventListener('input', debounce((e) => {
+    // Controls delegation
+    this.$.controlsContent.addEventListener('input', debounce(e => {
       const input = e.target.closest('[data-param]');
       if (!input) return;
       const id = input.dataset.effect;
       const param = input.dataset.param;
       const scale = parseFloat(input.dataset.scale || '1');
       let value = parseFloat(input.value) * scale;
-
       this.effectState[id].params[param] = value;
-      this._updateParamDisplay(input, param, value);
-      this._syncEffectsToManager();
-    }, 80));
+      this._updateValDisplay(input, param, value);
+      this._syncEffects();
+    }, 60));
 
-    this.els.effectsGrid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.mode-option');
-      if (!btn) return;
-      const id = btn.dataset.effect;
-      const param = btn.dataset.param;
-      const value = btn.dataset.value;
+    this.$.controlsContent.addEventListener('click', e => {
+      const chip = e.target.closest('.option-chip');
+      if (!chip) return;
+      const id = chip.dataset.effect;
+      const param = chip.dataset.param;
+      const value = chip.dataset.value;
       this.effectState[id].params[param] = value;
-
-      // Update active class
-      btn.parentElement.querySelectorAll('.mode-option').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      this._syncEffectsToManager();
+      chip.parentElement.querySelectorAll('.option-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      this._syncEffects();
     });
 
-    // Actions
-    this.els.btnReset.addEventListener('click', () => this._resetEffects());
-    this.els.btnExport.addEventListener('click', () => this._export());
+    this.$.btnReset.addEventListener('click', () => this._resetEffects());
+    this.$.btnExport.addEventListener('click', () => this._export());
   }
 
-  _setupManagerCallbacks() {
+  _setupManager() {
     this.manager.onTimeUpdate = (t) => {
-      this.els.currentTime.textContent = formatDuration(t);
-      this.els.seekBar.value = t;
-      this._drawWaveform();
+      if (this.isSeeking) return;
+      this.$.currentTime.textContent = formatDuration(t);
+      this.$.seekBar.value = t;
+      this._drawViz();
     };
     this.manager.onEnded = () => {
-      this.els.playBtn.textContent = '▶';
-      this.els.currentTime.textContent = formatDuration(0);
-      this.els.seekBar.value = 0;
+      this._setPlayIcon(false);
+      this.$.currentTime.textContent = '00:00';
+      this.$.seekBar.value = 0;
     };
     this.manager.onStateChange = (state) => {
-      this.els.playBtn.textContent = state === 'playing' ? '⏸' : '▶';
+      this._setPlayIcon(state === 'playing');
     };
+  }
+
+  _setPlayIcon(playing) {
+    this.$.playIcon.innerHTML = playing
+      ? '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>'
+      : '<path d="M8 5v14l11-7z"/>';
   }
 
   async _handleFile(file) {
     if (!isSupportedFormat(file.name)) {
-      this._toast('error', 'فرمت پشتیبانی نمی‌شود', 'لطفاً فایل‌های MP3، WAV، OGG یا M4A آپلود کنید.');
+      this._toast('error', 'فرمت پشتیبانی نمی‌شود', 'فقط MP3، WAV، OGG یا M4A');
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      this._toast('error', 'فایل خیلی بزرگ است', `حداکثر حجم مجاز حدود ${formatFileSize(MAX_FILE_SIZE)} است.`);
+      this._toast('error', 'فایل خیلی بزرگ است', `حداکثر حدود ${formatFileSize(MAX_FILE_SIZE)}`);
       return;
     }
 
-    this._showProgress('در حال بارگذاری و رمزگشایی فایل...');
+    this._showOverlay('در حال بارگذاری...');
     try {
       const info = await this.manager.loadFile(file);
-      this._hideProgress();
+      this._hideOverlay();
 
-      this.els.uploadSection.classList.add('has-file');
-      this.els.fileInfo.classList.add('visible');
-      this.els.fileName.textContent = info.name;
-      this.els.fileSize.textContent = formatFileSize(info.size);
-      this.els.fileDuration.textContent = formatDuration(info.duration);
-      this.els.fileFormat.textContent = (file.name.split('.').pop() || '').toUpperCase();
+      this.$.uploadZone.classList.add('has-file');
+      this.$.fileName.textContent = info.name;
+      this.$.fileSize.textContent = formatFileSize(info.size);
+      this.$.fileDuration.textContent = formatDuration(info.duration);
+      this.$.fileFormat.textContent = (file.name.split('.').pop() || '').toUpperCase();
 
-      this.els.playerSection.classList.add('visible');
-      this.els.effectsSection.classList.add('visible');
-      this.els.chainSection.classList.add('visible');
-      this.els.actionsBar.classList.add('visible');
+      this.$.playerPanel.classList.add('visible');
+      this.$.effectsWorkspace.classList.add('visible');
+      this.$.chainBar.classList.add('visible');
+      this.$.actionBar.classList.add('visible');
 
-      this.els.totalTime.textContent = formatDuration(info.duration);
-      this.els.seekBar.max = info.duration;
-      this.els.seekBar.value = 0;
-      this.els.currentTime.textContent = '00:00';
+      this.$.totalTime.textContent = formatDuration(info.duration);
+      this.$.seekBar.max = info.duration;
+      this.$.seekBar.value = 0;
+      this.$.currentTime.textContent = '00:00';
 
       this._resetEffects(true);
-      this._toast('success', 'فایل بارگذاری شد', `${info.name} آماده پردازش است.`);
+      this._toast('success', 'آماده', `${info.name} بارگذاری شد`);
     } catch (err) {
-      this._hideProgress();
-      if (err.message === 'DECODE_FAILED') {
-        this._toast('error', 'خطا در خواندن فایل', 'فایل صوتی خراب است یا قابل رمزگشایی نیست.');
-      } else {
-        this._toast('error', 'خطا', 'مشکلی در بارگذاری فایل رخ داد.');
-      }
+      this._hideOverlay();
+      this._toast('error', 'خطا', err.message === 'DECODE_FAILED'
+        ? 'فایل خراب است یا قابل خواندن نیست'
+        : 'بارگذاری ناموفق بود');
       console.error(err);
     }
   }
@@ -366,143 +304,244 @@ class App {
   _removeFile() {
     this.manager.dispose();
     this.manager = new AudioManager();
-    this._setupManagerCallbacks();
+    this._setupManager();
     this._initEffectState();
-    this._renderEffectCards();
+    this.selectedEffect = null;
+    this._renderSidebar();
+    this._showControlsEmpty();
 
-    this.els.uploadSection.classList.remove('has-file');
-    this.els.fileInfo.classList.remove('visible');
-    this.els.playerSection.classList.remove('visible');
-    this.els.effectsSection.classList.remove('visible');
-    this.els.chainSection.classList.remove('visible');
-    this.els.actionsBar.classList.remove('visible');
-    this.els.fileInput.value = '';
-    this.els.playBtn.textContent = '▶';
+    this.$.uploadZone.classList.remove('has-file');
+    this.$.playerPanel.classList.remove('visible');
+    this.$.effectsWorkspace.classList.remove('visible');
+    this.$.chainBar.classList.remove('visible');
+    this.$.actionBar.classList.remove('visible');
+    this.$.fileInput.value = '';
+    this._setPlayIcon(false);
   }
 
   _togglePlay() {
     if (!this.manager.originalBuffer) return;
-    if (this.manager.isPlaying) {
-      this.manager.pause();
-    } else {
-      this.manager.play();
-    }
+    if (this.manager.isPlaying) this.manager.pause();
+    else this.manager.play();
   }
 
   _setMode(mode) {
     this.manager.setPreviewMode(mode);
-    this.els.modeOriginal.classList.toggle('active', mode === 'original');
-    this.els.modeProcessed.classList.toggle('active', mode === 'processed');
+    this.$.modeOriginal.classList.toggle('active', mode === 'original');
+    this.$.modeProcessed.classList.toggle('active', mode === 'processed');
   }
 
   _toggleEffect(id, enabled) {
     this.effectState[id].enabled = enabled;
-    const card = this.els.effectsGrid.querySelector(`[data-effect-id="${id}"]`);
-    if (card) card.classList.toggle('active', enabled);
-    this._syncEffectsToManager();
-    this._updateChainUI();
+    const item = this.$.effectsSidebar.querySelector(`[data-id="${id}"]`);
+    if (item) item.classList.toggle('active-fx', enabled);
+    this._syncEffects();
+    this._updateChain();
+    // If selecting and enabling, show controls
+    if (enabled && this.selectedEffect !== id) this._selectEffect(id);
+    else if (this.selectedEffect === id) this._renderControls(id);
   }
 
-  _syncEffectsToManager() {
-    const list = effectOrder
-      .filter((id) => this.effectState[id])
-      .map((id) => ({
-        id,
-        params: { ...this.effectState[id].params },
-        enabled: this.effectState[id].enabled
-      }));
+  _selectEffect(id) {
+    this.selectedEffect = id;
+    this.$.effectsSidebar.querySelectorAll('.effect-item').forEach(el => {
+      el.classList.toggle('selected', el.dataset.id === id);
+    });
+    this._renderControls(id);
+  }
+
+  _renderControls(id) {
+    const meta = effectsRegistry[id].meta;
+    const params = this.effectState[id].params;
+    this.$.controlsEmpty.style.display = 'none';
+    this.$.controlsContent.style.display = 'block';
+
+    let body = `
+      <div class="controls-header">
+        <div class="fx-icon">${ICONS[meta.icon] || ''}</div>
+        <div>
+          <h3>${meta.name}</h3>
+          <p>${meta.description}</p>
+        </div>
+      </div>
+    `;
+
+    if (id === 'femaleVoice') {
+      body += this._chips(id, 'mode', 'حالت', [
+        { v: 'girl', l: 'دخترانه' }, { v: 'woman', l: 'زنانه' }
+      ], params.mode);
+      body += this._slider(id, 'intensity', 'شدت', 0, 100, params.intensity * 100, 0.01, '%');
+    } else if (id === 'deepVoice') {
+      body += this._slider(id, 'intensity', 'شدت', 0, 100, params.intensity * 100, 0.01, '%');
+    } else if (id === 'autotune') {
+      body += this._chips(id, 'key', 'کلید (Key)', NOTE_NAMES.map(n => ({ v: n, l: n })), params.key);
+      body += this._chips(id, 'scale', 'گام (Scale)', [
+        { v: 'major', l: 'ماژور' }, { v: 'minor', l: 'مینور' }, { v: 'chromatic', l: 'کروماتیک' }
+      ], params.scale);
+      body += this._slider(id, 'amount', 'میزان تصحیح', 0, 100, params.amount * 100, 0.01, '%');
+      body += this._slider(id, 'retuneSpeed', 'سرعت Retune', 0, 100, params.retuneSpeed * 100, 0.01, '%');
+      body += this._slider(id, 'humanize', 'انسانی‌سازی', 0, 100, params.humanize * 100, 0.01, '%');
+      body += this._slider(id, 'mix', 'مخلوط', 0, 100, params.mix * 100, 0.01, '%');
+    } else if (id === 'echo') {
+      body += this._slider(id, 'delay', 'تأخیر', 5, 100, params.delay * 100, 0.01, 's', v => (v).toFixed(2) + 's');
+      body += this._slider(id, 'feedback', 'بازخورد', 0, 80, params.feedback * 100, 0.01, '%');
+      body += this._slider(id, 'mix', 'مخلوط', 0, 100, params.mix * 100, 0.01, '%');
+    } else if (id === 'studio') {
+      body += this._slider(id, 'roomSize', 'اندازه فضا', 10, 100, params.roomSize * 100, 0.01, '%');
+      body += this._slider(id, 'wet', 'میزان ریورب', 5, 60, params.wet * 100, 0.01, '%');
+      body += this._slider(id, 'intensity', 'شدت', 20, 100, params.intensity * 100, 0.01, '%');
+    } else if (id === 'bassBoost') {
+      body += this._slider(id, 'amount', 'مقدار بیس', 0, 15, params.amount, 1, 'dB', v => v + ' dB');
+      body += this._slider(id, 'frequency', 'فرکانس', 60, 200, params.frequency, 1, 'Hz', v => v + ' Hz');
+    } else if (id === 'volume') {
+      body += this._slider(id, 'gain', 'بلندی', 10, 300, params.gain * 100, 0.01, '%');
+    } else {
+      // speaker, police, improveQuality
+      body += this._slider(id, 'intensity', 'شدت', 0, 100, params.intensity * 100, 0.01, '%');
+    }
+
+    this.$.controlsContent.innerHTML = body;
+  }
+
+  _slider(id, param, label, min, max, value, scale, unit, fmt) {
+    const display = fmt ? fmt(value * (scale < 1 ? scale : 1) === value ? value : value) : (
+      unit === '%' ? Math.round(value) + '%' :
+      unit === 'dB' ? value + ' dB' :
+      unit === 'Hz' ? value + ' Hz' :
+      unit === 's' ? (value / 100).toFixed(2) + 's' : value
+    );
+    // Simpler display
+    let disp;
+    if (unit === '%') disp = Math.round(value) + '%';
+    else if (unit === 'dB') disp = value + ' dB';
+    else if (unit === 'Hz') disp = value + ' Hz';
+    else if (unit === 's') disp = (value * scale).toFixed(2) + 's';
+    else disp = value;
+
+    return `
+      <div class="control-row">
+        <div class="control-label"><span>${label}</span><span class="val" data-value-display="${param}">${disp}</span></div>
+        <input type="range" min="${min}" max="${max}" value="${value}" data-param="${param}" data-effect="${id}" data-scale="${scale}" aria-label="${label}">
+      </div>
+    `;
+  }
+
+  _chips(id, param, label, options, current) {
+    const chips = options.map(o =>
+      `<button type="button" class="option-chip ${o.v === current ? 'active' : ''}" data-effect="${id}" data-param="${param}" data-value="${o.v}">${o.l}</button>`
+    ).join('');
+    return `
+      <div class="control-row">
+        <div class="control-label"><span>${label}</span></div>
+        <div class="option-group">${chips}</div>
+      </div>
+    `;
+  }
+
+  _updateValDisplay(input, param, value) {
+    const row = input.closest('.control-row');
+    const el = row?.querySelector(`[data-value-display="${param}"]`);
+    if (!el) return;
+    if (param === 'intensity' || param === 'feedback' || param === 'mix' || param === 'roomSize' || param === 'wet' || param === 'amount' && value <= 1 || param === 'retuneSpeed' || param === 'humanize' || param === 'gain') {
+      el.textContent = Math.round(value * 100) / (param === 'amount' && value > 1 ? 1 : 1);
+      // fix
+      if (['intensity','feedback','mix','roomSize','wet','retuneSpeed','humanize'].includes(param) || (param === 'amount' && value <= 1) || param === 'gain') {
+        el.textContent = Math.round(value * 100) + '%';
+      } else if (param === 'amount') {
+        el.textContent = value + ' dB';
+      } else if (param === 'frequency') {
+        el.textContent = value + ' Hz';
+      } else if (param === 'delay') {
+        el.textContent = value.toFixed(2) + 's';
+      }
+    } else if (param === 'delay') {
+      el.textContent = value.toFixed(2) + 's';
+    } else if (param === 'amount') {
+      el.textContent = value + ' dB';
+    } else if (param === 'frequency') {
+      el.textContent = value + ' Hz';
+    }
+  }
+
+  _showControlsEmpty() {
+    this.$.controlsEmpty.style.display = 'flex';
+    this.$.controlsContent.style.display = 'none';
+    this.$.controlsContent.innerHTML = '';
+  }
+
+  _syncEffects() {
+    const list = effectOrder.map(id => ({
+      id,
+      params: { ...this.effectState[id].params },
+      enabled: this.effectState[id].enabled
+    }));
     this.manager.setActiveEffects(list);
-    this._updateChainUI();
+    this._updateChain();
   }
 
-  _updateChainUI() {
-    const list = this.els.chainList;
-    const active = effectOrder.filter((id) => this.effectState[id]?.enabled);
+  _updateChain() {
+    const active = effectOrder.filter(id => this.effectState[id]?.enabled);
     if (active.length === 0) {
-      list.innerHTML = '<span class="chain-empty">هیچ افکتی فعال نیست — صدای اصلی پخش می‌شود</span>';
+      this.$.chainFlow.innerHTML = '<span class="chain-empty-msg">هیچ افکتی فعال نیست</span>';
       return;
     }
-    list.innerHTML = active
-      .map((id, i) => {
-        const name = effectsRegistry[id].meta.name;
-        const arrow = i < active.length - 1 ? '<span class="chain-arrow">←</span>' : '';
-        return `<span class="chain-item">${name} <span class="remove" data-remove="${id}" title="غیرفعال کردن">×</span></span>${arrow}`;
-      })
-      .join('');
+    this.$.chainFlow.innerHTML = active.map((id, i) => {
+      const name = effectsRegistry[id].meta.name;
+      const arrow = i < active.length - 1 ? '<span class="chain-arrow">←</span>' : '';
+      return `<span class="chain-chip">${name}<span class="x" data-rm="${id}">×</span></span>${arrow}`;
+    }).join('');
 
-    list.querySelectorAll('[data-remove]').forEach((el) => {
+    this.$.chainFlow.querySelectorAll('[data-rm]').forEach(el => {
       el.addEventListener('click', () => {
-        const id = el.dataset.remove;
+        const id = el.dataset.rm;
         this.effectState[id].enabled = false;
-        const toggle = this.els.effectsGrid.querySelector(`[data-toggle="${id}"]`);
-        if (toggle) toggle.checked = false;
-        const card = this.els.effectsGrid.querySelector(`[data-effect-id="${id}"]`);
-        if (card) card.classList.remove('active');
-        this._syncEffectsToManager();
+        const cb = this.$.effectsSidebar.querySelector(`[data-toggle="${id}"]`);
+        if (cb) cb.checked = false;
+        const item = this.$.effectsSidebar.querySelector(`[data-id="${id}"]`);
+        if (item) item.classList.remove('active-fx');
+        this._syncEffects();
       });
     });
-  }
-
-  _updateParamDisplay(input, param, value) {
-    const group = input.closest('.control-group');
-    const display = group?.querySelector(`[data-value-display="${param}"]`);
-    if (!display) return;
-
-    if (param === 'intensity' || param === 'feedback' || param === 'mix' || param === 'roomSize' || param === 'wet') {
-      display.textContent = `${Math.round(value * 100)}%`;
-    } else if (param === 'delay') {
-      display.textContent = `${value.toFixed(2)}s`;
-    } else if (param === 'amount') {
-      display.textContent = `${value} dB`;
-    } else if (param === 'frequency') {
-      display.textContent = `${value} Hz`;
-    } else if (param === 'gain') {
-      display.textContent = `${Math.round(value * 100)}%`;
-    } else {
-      display.textContent = String(value);
-    }
   }
 
   _resetEffects(silent = false) {
     this.manager.reset();
     this._initEffectState();
-    this._renderEffectCards();
-    this._updateChainUI();
+    this.selectedEffect = null;
+    this._renderSidebar();
+    this._showControlsEmpty();
+    this._updateChain();
     this._setMode('processed');
-    if (!silent) {
-      this._toast('success', 'بازنشانی شد', 'همه افکت‌ها غیرفعال شدند و به صدای اصلی بازگشتید.');
-    }
+    if (!silent) this._toast('success', 'بازنشانی', 'همه افکت‌ها غیرفعال شدند');
   }
 
   async _export() {
-    if (!this.manager.originalBuffer) return;
-    if (this.isProcessing) return;
-
+    if (!this.manager.originalBuffer || this.isProcessing) return;
     this.isProcessing = true;
-    this.els.btnExport.disabled = true;
-    this.els.btnReset.disabled = true;
-    this._showProgress('در حال پردازش و آماده‌سازی خروجی...');
+    this.$.btnExport.disabled = true;
+    this.$.btnReset.disabled = true;
+    this._showOverlay('در حال رندر خروجی...');
 
     try {
-      const name = await this.manager.exportWav((p) => {
-        this.els.progressBar.style.width = `${Math.round(p * 100)}%`;
-        this.els.progressText.textContent = `در حال رندر خروجی... ${Math.round(p * 100)}%`;
+      const name = await this.manager.exportWav(p => {
+        this.$.progressFill.style.width = Math.round(p * 100) + '%';
+        this.$.overlayText.textContent = `رندر خروجی... ${Math.round(p * 100)}%`;
       });
-      this._hideProgress();
-      this._toast('success', 'خروجی آماده شد', `فایل «${name}» دانلود شد.`);
+      this._hideOverlay();
+      this._toast('success', 'دانلود شد', name);
     } catch (err) {
-      this._hideProgress();
-      this._toast('error', 'خطا در خروجی', 'پردازش یا ساخت فایل خروجی با مشکل مواجه شد. لطفاً دوباره تلاش کنید.');
+      this._hideOverlay();
+      this._toast('error', 'خطا در خروجی', 'پردازش ناموفق بود. دوباره تلاش کنید.');
       console.error(err);
     } finally {
       this.isProcessing = false;
-      this.els.btnExport.disabled = false;
-      this.els.btnReset.disabled = false;
+      this.$.btnExport.disabled = false;
+      this.$.btnReset.disabled = false;
     }
   }
 
-  _drawWaveform() {
-    const canvas = this.els.waveformCanvas;
+  _drawViz() {
+    const canvas = this.$.vizCanvas;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const data = this.manager.getAnalyserData();
@@ -517,13 +556,13 @@ class App {
       ctx.scale(dpr, dpr);
     }
 
-    ctx.fillStyle = '#0f1419';
+    const theme = document.documentElement.getAttribute('data-theme');
+    ctx.fillStyle = theme === 'light' ? '#f0f4f8' : '#0b1220';
     ctx.fillRect(0, 0, w, h);
 
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#3b82f6';
+    ctx.strokeStyle = theme === 'light' ? '#2563eb' : '#3b82f6';
     ctx.beginPath();
-
     const slice = w / data.length;
     let x = 0;
     for (let i = 0; i < data.length; i++) {
@@ -536,38 +575,33 @@ class App {
     ctx.stroke();
   }
 
-  _showProgress(text) {
-    this.els.progressOverlay.classList.add('visible');
-    this.els.progressText.textContent = text || 'در حال پردازش...';
-    this.els.progressBar.style.width = '10%';
+  _showOverlay(text) {
+    this.$.overlay.classList.add('visible');
+    this.$.overlayText.textContent = text || 'در حال پردازش...';
+    this.$.progressFill.style.width = '8%';
   }
 
-  _hideProgress() {
-    this.els.progressOverlay.classList.remove('visible');
-    this.els.progressBar.style.width = '0%';
+  _hideOverlay() {
+    this.$.overlay.classList.remove('visible');
+    this.$.progressFill.style.width = '0%';
   }
 
   _toast(type, title, msg) {
-    const icons = { error: '⚠️', success: '✅', warning: '⚡' };
     const el = document.createElement('div');
     el.className = `toast ${type}`;
     el.innerHTML = `
-      <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
-      <div class="toast-content">
+      <div class="toast-body">
         <div class="toast-title">${title}</div>
         <div class="toast-msg">${msg}</div>
       </div>
       <button class="toast-close" aria-label="بستن">×</button>
     `;
     el.querySelector('.toast-close').addEventListener('click', () => el.remove());
-    this.els.toastContainer.appendChild(el);
-    setTimeout(() => {
-      if (el.parentNode) el.remove();
-    }, 5500);
+    this.$.toastBox.appendChild(el);
+    setTimeout(() => el.parentNode && el.remove(), 5000);
   }
 }
 
-// Boot
 document.addEventListener('DOMContentLoaded', () => {
   window.audioEditorApp = new App();
 });
