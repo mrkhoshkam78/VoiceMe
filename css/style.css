@@ -22,9 +22,11 @@
   --warning: #f59e0b;
   --danger: #ef4444;
   --danger-soft: rgba(239, 68, 68, 0.12);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow: 0 4px 24px rgba(0,0,0,0.35);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.45);
+  --shadow-sm: 0 2px 6px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow: 0 4px 16px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.2);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.25);
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.28), 0 1px 4px rgba(0,0,0,0.18);
+  --shadow-card-hover: 0 8px 28px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2);
   --radius: 14px;
   --radius-sm: 8px;
   --radius-xs: 6px;
@@ -53,9 +55,11 @@
   --warning: #d97706;
   --danger: #dc2626;
   --danger-soft: rgba(220, 38, 38, 0.08);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow: 0 4px 20px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow: 0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-card: 0 4px 18px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 8px 28px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05);
 }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -175,6 +179,7 @@ body {
   cursor: pointer;
   transition: all var(--transition);
   position: relative;
+  box-shadow: var(--shadow-card);
 }
 
 .upload-zone:hover, .upload-zone.dragover {
@@ -329,7 +334,8 @@ body {
   border-radius: var(--radius);
   padding: 1.15rem 1.25rem;
   display: none;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--transition);
 }
 
 .player-panel.visible { display: block; animation: fadeUp 0.3s ease; }
@@ -476,7 +482,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.85rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
   max-height: 560px;
   overflow-y: auto;
 }
@@ -600,7 +606,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.15rem 1.25rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
   min-height: 200px;
 }
 
@@ -728,7 +734,7 @@ input[type="range"]:disabled { opacity: 0.35; cursor: not-allowed; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.85rem 1.1rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
 }
 
 .chain-bar.visible { display: block; animation: fadeUp 0.3s ease; }
