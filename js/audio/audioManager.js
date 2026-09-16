@@ -1,6 +1,6 @@
 /**
- * AudioManager – handles decoding, real-time preview graph,
- * offline rendering, and export.
+ * AudioManager V1.02
+ * Fixed: effect chain connectivity, seek sync with playbackRate, offline = preview pipeline
  */
 
 import { createEffectNodes, effectsRegistry } from '../effects/index.js';
@@ -12,26 +12,26 @@ export class AudioManager {
     this.originalBuffer = null;
     this.fileName = '';
     this.fileSize = 0;
-    this.fileType = '';
 
-    // Real-time graph
     this.sourceNode = null;
-    this.effectChain = []; // { id, nodes, params }
+    this.effectChain = [];
     this.masterGain = null;
     this.analyser = null;
-    this.isPlaying = false;
-    this.startTime = 0;
-    this.pauseOffset = 0;
-    this.previewMode = 'processed'; // 'original' | 'processed'
 
-    // Active effect params (order matters)
-    this.activeEffects = []; // [{ id, params, enabled }]
+    this.isPlaying = false;
+    this.startContextTime = 0;   // audioContext.currentTime when play started
+    this.pauseOffset = 0;        // position in SOURCE buffer (seconds) when paused/stopped
+    this.currentRate = 1;        // active playbackRate
+    this.previewMode = 'processed';
+
+    this.activeEffects = [];     // [{ id, params, enabled }]
 
     this.onTimeUpdate = null;
     this.onEnded = null;
     this.onStateChange = null;
 
     this._rafId = null;
+    this._seeking = false;
   }
 
   async initContext() {
@@ -46,11 +46,10 @@ export class AudioManager {
 
   async loadFile(file) {
     await this.initContext();
-    this.stop();
+    this.stop(true);
     this.originalBuffer = null;
     this.fileName = file.name;
     this.fileSize = file.size;
-    this.fileType = file.type || '';
 
     const arrayBuffer = await file.arrayBuffer();
     try {
@@ -60,6 +59,7 @@ export class AudioManager {
     }
 
     this.pauseOffset = 0;
+    this.currentRate = 1;
     this.activeEffects = [];
     return {
       duration: this.originalBuffer.duration,
@@ -74,94 +74,137 @@ export class AudioManager {
     return this.originalBuffer ? this.originalBuffer.duration : 0;
   }
 
+  /**
+   * Current position in the SOURCE buffer (0 … duration).
+   * Accounts for playbackRate so seekbar stays in sync with audio content.
+   */
   getCurrentTime() {
     if (!this.isPlaying || !this.audioContext) return this.pauseOffset;
-    return this.pauseOffset + (this.audioContext.currentTime - this.startTime);
+    const elapsed = this.audioContext.currentTime - this.startContextTime;
+    const pos = this.pauseOffset + elapsed * this.currentRate;
+    return clamp(pos, 0, this.getDuration());
   }
 
   /**
-   * Build the real-time processing graph according to activeEffects order.
-   * Pitch-shifting effects return pitchFactor which is applied to the BufferSource.
+   * Combined pitch factor from all enabled voice-type effects.
+   */
+  _computePitchFactor(effects) {
+    let factor = 1;
+    for (const e of effects) {
+      if (!e.enabled) continue;
+      // Peek pitchFactor by creating nodes (lightweight for this purpose)
+      try {
+        const result = createEffectNodes(this.audioContext, e.id, e.params);
+        if (result.pitchFactor && result.pitchFactor !== 1) {
+          factor *= result.pitchFactor;
+        }
+        // Disconnect temp nodes immediately
+        (result.nodes || []).forEach(n => { try { n.disconnect(); } catch (_) {} });
+      } catch (_) {}
+    }
+    return clamp(factor, 0.5, 2.0);
+  }
+
+  /**
+   * Build real-time graph.
+   * Signal: Source → Effect1 → Effect2 → … → MasterGain → Analyser → Destination
    */
   _buildGraph() {
     if (!this.audioContext || !this.originalBuffer) return;
 
-    // Disconnect previous
+    // Tear down previous graph
     if (this.sourceNode) {
+      try { this.sourceNode.onended = null; this.sourceNode.stop(); } catch (_) {}
       try { this.sourceNode.disconnect(); } catch (_) {}
+      this.sourceNode = null;
     }
-    this.effectChain.forEach((item) => {
-      item.nodes.forEach((n) => {
-        try { n.disconnect(); } catch (_) {}
-      });
+    this.effectChain.forEach(item => {
+      (item.nodes || []).forEach(n => { try { n.disconnect(); } catch (_) {} });
     });
     this.effectChain = [];
-
-    if (this.masterGain) {
-      try { this.masterGain.disconnect(); } catch (_) {}
-    }
+    if (this.masterGain) { try { this.masterGain.disconnect(); } catch (_) {} }
+    if (this.analyser) { try { this.analyser.disconnect(); } catch (_) {} }
 
     this.masterGain = this.audioContext.createGain();
     this.masterGain.gain.value = 1;
 
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.7;
 
     this.masterGain.connect(this.analyser);
     this.analyser.connect(this.audioContext.destination);
 
-    // Calculate combined pitch factor from voice effects
-    let pitchFactor = 1;
-    const enabled = this.activeEffects.filter((e) => e.enabled);
+    const enabled = this.activeEffects.filter(e => e.enabled);
+    this.currentRate = 1;
 
-    // Create source
     this.sourceNode = this.audioContext.createBufferSource();
     this.sourceNode.buffer = this.originalBuffer;
     this.sourceNode.loop = false;
 
-    let currentNode = this.sourceNode;
+    let current = this.sourceNode;
 
     if (this.previewMode === 'original' || enabled.length === 0) {
-      currentNode.connect(this.masterGain);
+      // Direct path – no effects
+      this.currentRate = 1;
     } else {
       for (const effect of enabled) {
         const result = createEffectNodes(this.audioContext, effect.id, effect.params);
-        this.effectChain.push({ id: effect.id, nodes: result.nodes || [], update: result.update });
-
+        this.effectChain.push({
+          id: effect.id,
+          nodes: result.nodes || [],
+          update: result.update || null,
+          input: result.input,
+          output: result.output
+        });
         if (result.pitchFactor && result.pitchFactor !== 1) {
-          pitchFactor *= result.pitchFactor;
+          this.currentRate *= result.pitchFactor;
         }
-
-        currentNode.connect(result.input);
-        currentNode = result.output;
+        current.connect(result.input);
+        current = result.output;
       }
-      currentNode.connect(this.masterGain);
+      this.currentRate = clamp(this.currentRate, 0.5, 2.0);
     }
 
-    // Apply pitch (changes speed & pitch together – known limitation)
-    this.sourceNode.playbackRate.value = clamp(pitchFactor, 0.5, 2.0);
+    current.connect(this.masterGain);
+    this.sourceNode.playbackRate.value = this.currentRate;
 
     this.sourceNode.onended = () => {
-      if (this.isPlaying) {
+      // Only fire if we reached natural end (not stop/seek)
+      if (this.isPlaying && !this._seeking) {
         this.isPlaying = false;
         this.pauseOffset = 0;
+        this._stopTimeUpdate();
         if (this.onEnded) this.onEnded();
         if (this.onStateChange) this.onStateChange('stopped');
-        this._stopTimeUpdate();
       }
     };
   }
 
-  play(fromOffset = null) {
+  async play(fromOffset = null) {
     if (!this.originalBuffer) return;
-    this.stop(false);
+    await this.initContext();
 
-    const offset = fromOffset !== null ? fromOffset : this.pauseOffset;
+    const offset = fromOffset !== null ? clamp(fromOffset, 0, this.getDuration()) : this.pauseOffset;
     this.pauseOffset = offset;
+    this._seeking = false;
 
     this._buildGraph();
-    this.sourceNode.start(0, offset);
-    this.startTime = this.audioContext.currentTime;
+
+    // When rate != 1 the remaining playable length changes
+    const remaining = (this.getDuration() - offset) / this.currentRate;
+    try {
+      this.sourceNode.start(0, offset);
+      // Schedule stop so onended fires reliably even with rate change
+      if (remaining > 0 && isFinite(remaining)) {
+        this.sourceNode.stop(this.audioContext.currentTime + remaining + 0.05);
+      }
+    } catch (err) {
+      console.error('play start error', err);
+      return;
+    }
+
+    this.startContextTime = this.audioContext.currentTime;
     this.isPlaying = true;
     this._startTimeUpdate();
     if (this.onStateChange) this.onStateChange('playing');
@@ -170,31 +213,39 @@ export class AudioManager {
   pause() {
     if (!this.isPlaying) return;
     this.pauseOffset = this.getCurrentTime();
-    this.stop(false);
+    this._seeking = true;
+    this._stopGraphSource();
     this.isPlaying = false;
+    this._stopTimeUpdate();
     if (this.onStateChange) this.onStateChange('paused');
   }
 
   stop(resetOffset = true) {
-    this._stopTimeUpdate();
-    if (this.sourceNode) {
-      try {
-        this.sourceNode.onended = null;
-        this.sourceNode.stop();
-        this.sourceNode.disconnect();
-      } catch (_) {}
-      this.sourceNode = null;
-    }
+    this._seeking = true;
+    this._stopGraphSource();
     this.isPlaying = false;
+    this._stopTimeUpdate();
     if (resetOffset) this.pauseOffset = 0;
     if (this.onStateChange) this.onStateChange('stopped');
   }
 
+  _stopGraphSource() {
+    if (this.sourceNode) {
+      try { this.sourceNode.onended = null; this.sourceNode.stop(); } catch (_) {}
+      try { this.sourceNode.disconnect(); } catch (_) {}
+      this.sourceNode = null;
+    }
+  }
+
   seek(time) {
+    const t = clamp(time, 0, this.getDuration());
     const wasPlaying = this.isPlaying;
-    this.pauseOffset = clamp(time, 0, this.getDuration());
+    this.pauseOffset = t;
     if (wasPlaying) {
-      this.play(this.pauseOffset);
+      this.play(t);
+    } else {
+      // Update UI time even when paused
+      if (this.onTimeUpdate) this.onTimeUpdate(t);
     }
   }
 
@@ -202,43 +253,32 @@ export class AudioManager {
     const wasPlaying = this.isPlaying;
     const t = this.getCurrentTime();
     this.previewMode = mode;
-    if (wasPlaying) {
-      this.play(t);
-    } else {
-      this._buildGraph(); // keep graph ready
-    }
+    if (wasPlaying) this.play(t);
   }
 
-  /**
-   * Update active effects list (order preserved)
-   */
   setActiveEffects(effectsList) {
-    // effectsList: [{ id, params, enabled }]
     const wasPlaying = this.isPlaying;
     const t = this.getCurrentTime();
-    this.activeEffects = effectsList.map((e) => ({
+    this.activeEffects = effectsList.map(e => ({
       id: e.id,
       params: { ...e.params },
       enabled: !!e.enabled
     }));
     if (wasPlaying) {
       this.play(t);
-    } else if (this.originalBuffer) {
-      this._buildGraph();
     }
   }
 
   updateEffectParams(id, params) {
-    const effect = this.activeEffects.find((e) => e.id === id);
+    const effect = this.activeEffects.find(e => e.id === id);
     if (!effect) return;
     Object.assign(effect.params, params);
 
-    // Try live update if the effect supports it
-    const chainItem = this.effectChain.find((c) => c.id === id);
-    if (chainItem && chainItem.update) {
+    const chainItem = this.effectChain.find(c => c.id === id);
+    if (chainItem && typeof chainItem.update === 'function') {
       chainItem.update(params);
     } else if (this.isPlaying) {
-      // Rebuild for effects that need it (pitch, etc.)
+      // Effects that affect pitchFactor need full rebuild
       const t = this.getCurrentTime();
       this.play(t);
     }
@@ -249,9 +289,10 @@ export class AudioManager {
     const tick = () => {
       if (!this.isPlaying) return;
       const t = this.getCurrentTime();
-      if (t >= this.getDuration()) {
+      if (t >= this.getDuration() - 0.02) {
         this.isPlaying = false;
         this.pauseOffset = 0;
+        this._stopTimeUpdate();
         if (this.onEnded) this.onEnded();
         if (this.onStateChange) this.onStateChange('stopped');
         return;
@@ -276,40 +317,64 @@ export class AudioManager {
     return data;
   }
 
+  getFrequencyData() {
+    if (!this.analyser) return null;
+    const data = new Uint8Array(this.analyser.frequencyBinCount);
+    this.analyser.getByteFrequencyData(data);
+    return data;
+  }
+
   /**
-   * Offline render of the full chain → AudioBuffer
+   * Offline render – identical effect chain as real-time preview.
    */
   async renderOffline(onProgress) {
     if (!this.originalBuffer) throw new Error('NO_BUFFER');
+    await this.initContext();
 
-    const enabled = this.activeEffects.filter((e) => e.enabled);
-    const duration = this.originalBuffer.duration;
-    const sampleRate = this.originalBuffer.sampleRate;
-    const channels = this.originalBuffer.numberOfChannels;
+    let workingBuffer = this.originalBuffer;
+    const enabled = this.activeEffects.filter(e => e.enabled);
 
-    // Combined pitch
+    // AutoTune offline pre-process (pitch correction on buffer)
+    const atEffect = enabled.find(e => e.id === 'autotune');
+    if (atEffect) {
+      const entry = effectsRegistry['autotune'];
+      if (entry && entry.processOfflineBuffer) {
+        if (onProgress) onProgress(0.05);
+        workingBuffer = await entry.processOfflineBuffer(
+          workingBuffer,
+          atEffect.params,
+          (p) => { if (onProgress) onProgress(0.05 + p * 0.4); }
+        );
+      }
+    }
+
+    // Remaining effects (skip autotune nodes since already applied)
+    const chainEffects = enabled.filter(e => e.id !== 'autotune');
+
+    const duration = workingBuffer.duration;
+    const sampleRate = workingBuffer.sampleRate;
+    const channels = workingBuffer.numberOfChannels;
+
     let pitchFactor = 1;
-    for (const effect of enabled) {
-      // Peek pitch without full node creation
-      const tempCtx = this.audioContext;
-      const result = createEffectNodes(tempCtx, effect.id, effect.params);
-      if (result.pitchFactor) pitchFactor *= result.pitchFactor;
-      // cleanup not strictly needed
+    for (const e of chainEffects) {
+      try {
+        const r = createEffectNodes(this.audioContext, e.id, e.params);
+        if (r.pitchFactor) pitchFactor *= r.pitchFactor;
+        (r.nodes || []).forEach(n => { try { n.disconnect(); } catch (_) {} });
+      } catch (_) {}
     }
     pitchFactor = clamp(pitchFactor, 0.5, 2.0);
 
-    // When pitch changes, rendered duration changes
     const renderedDuration = duration / pitchFactor;
-
-    const offlineCtx = new OfflineAudioContext(channels, Math.ceil(sampleRate * renderedDuration), sampleRate);
+    const frameCount = Math.max(1, Math.ceil(sampleRate * renderedDuration));
+    const offlineCtx = new OfflineAudioContext(channels, frameCount, sampleRate);
 
     const source = offlineCtx.createBufferSource();
-    source.buffer = this.originalBuffer;
+    source.buffer = workingBuffer;
     source.playbackRate.value = pitchFactor;
 
     let current = source;
-
-    for (const effect of enabled) {
+    for (const effect of chainEffects) {
       const result = createEffectNodes(offlineCtx, effect.id, effect.params);
       current.connect(result.input);
       current = result.output;
@@ -319,33 +384,28 @@ export class AudioManager {
     master.gain.value = 1;
     current.connect(master);
     master.connect(offlineCtx.destination);
-
     source.start(0);
 
-    // Progress simulation (OfflineAudioContext has limited progress events)
-    let progressInterval;
+    let progressTimer;
     if (onProgress) {
-      let p = 0;
-      progressInterval = setInterval(() => {
-        p = Math.min(0.95, p + 0.05);
+      let p = 0.5;
+      progressTimer = setInterval(() => {
+        p = Math.min(0.95, p + 0.03);
         onProgress(p);
-      }, 100);
+      }, 80);
     }
 
     try {
       const rendered = await offlineCtx.startRendering();
-      if (progressInterval) clearInterval(progressInterval);
+      if (progressTimer) clearInterval(progressTimer);
       if (onProgress) onProgress(1);
       return rendered;
     } catch (err) {
-      if (progressInterval) clearInterval(progressInterval);
+      if (progressTimer) clearInterval(progressTimer);
       throw new Error('RENDER_FAILED');
     }
   }
 
-  /**
-   * Export processed audio as WAV
-   */
   async exportWav(onProgress) {
     const buffer = await this.renderOffline(onProgress);
     const blob = audioBufferToWav(buffer);
@@ -356,14 +416,14 @@ export class AudioManager {
   }
 
   reset() {
-    this.stop();
+    this.stop(true);
     this.activeEffects = [];
     this.previewMode = 'processed';
-    this.pauseOffset = 0;
+    this.currentRate = 1;
   }
 
   dispose() {
-    this.stop();
+    this.stop(true);
     if (this.audioContext) {
       this.audioContext.close().catch(() => {});
       this.audioContext = null;
