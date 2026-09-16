@@ -824,9 +824,13 @@ input[type="range"]:disabled { opacity: 0.35; cursor: not-allowed; }
   justify-content: center;
   flex-direction: column;
   gap: 1rem;
+  pointer-events: none; /* never block clicks when hidden */
 }
 
-.overlay.visible { display: flex; }
+.overlay.visible {
+  display: flex;
+  pointer-events: auto;
+}
 
 .spinner {
   width: 40px;
