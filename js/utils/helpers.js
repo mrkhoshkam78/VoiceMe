@@ -23,7 +23,7 @@ export function getFileExtension(filename) {
 
 export function isSupportedFormat(filename) {
   const ext = getFileExtension(filename);
-  return ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'webm'].includes(ext);
+  return ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'webm', 'opus'].includes(ext);
 }
 
 /** Encode AudioBuffer → 16-bit PCM WAV Blob */
