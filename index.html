@@ -35,7 +35,7 @@
         </div>
         <h2>فایل صوتی را آپلود کنید</h2>
         <p>MP3 · WAV · OGG · M4A — یا فایل را اینجا رها کنید</p>
-        <button type="button" class="btn btn-primary" id="btnPickFile">انتخاب فایل</button>
+        <label for="fileInput" class="btn btn-primary" id="btnPickFile" style="cursor:pointer">انتخاب فایل</label>
       </div>
       <div class="file-card" id="fileCard">
         <div class="file-card-icon">
@@ -127,6 +127,25 @@
 
   <div class="toast-box" id="toastBox"></div>
 
-  <script type="module" src="js/app.js"></script>
+  <script>
+  // Show error if modules fail (e.g. opened as file:// without a server)
+  window.addEventListener('error', function(e) {
+    if (e.filename && e.filename.indexOf('.js') !== -1) {
+      console.error(e);
+    }
+  });
+</script>
+<script type="module" src="js/app.js"></script>
+<script type="module">
+  // If app did not boot in 2s, show hint
+  setTimeout(() => {
+    if (!window.audioEditorApp) {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;bottom:1rem;right:1rem;left:1rem;max-width:420px;margin:auto;background:#1a2332;color:#fff;padding:1rem 1.2rem;border-radius:12px;z-index:9999;font-family:Tahoma,sans-serif;font-size:14px;direction:rtl;box-shadow:0 8px 30px rgba(0,0,0,.4)';
+      el.innerHTML = '<b>اپلیکیشن بارگذاری نشد.</b><br>لطفاً با یک سرور محلی باز کنید:<br><code style="display:block;margin-top:8px;background:#0b1220;padding:8px;border-radius:6px">npx serve .</code><br>یا <code>python -m http.server 8080</code>';
+      document.body.appendChild(el);
+    }
+  }, 2000);
+</script>
 </body>
 </html>
