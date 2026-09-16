@@ -1,5 +1,5 @@
 /**
- * Audio Editor V1.03 – Application (UI layer only)
+ * Audio Editor V1.04-RT – Application (UI layer only) — effect toggle FIXED
  * Audio logic lives in audio-engine/
  */
 
