@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="VoiceMe – Professional Vocal Engine, AutoTune, Export & Immersive UI">
-  <title>VoiceMe V1.05.1 — Professional Vocal Engine</title>
+  <title>VoiceMe V1.06 — Professional Vocal Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,9 +17,26 @@
         <svg viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
       </div>
       <h1>VoiceMe</h1>
-      <span class="version-badge">V1.05.1</span>
+      <span class="version-badge">V1.06</span>
     </div>
-    <div class="header-actions">
+    <div class="header-actions" id="headerActions">
+      <div class="header-export" id="headerExport" hidden>
+        <select id="exportFormat" class="hdr-select" aria-label="فرمت خروجی"></select>
+        <select id="exportBitrate" class="hdr-select" aria-label="بیت‌ریت">
+          <option value="128">128k</option>
+          <option value="192" selected>192k</option>
+          <option value="256">256k</option>
+          <option value="320">320k</option>
+        </select>
+        <select id="exportChannels" class="hdr-select" aria-label="کانال">
+          <option value="2">Stereo</option>
+          <option value="1">Mono</option>
+        </select>
+        <button type="button" class="btn btn-success btn-sm" id="btnExportHdr">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+      </div>
       <button type="button" class="theme-btn" id="themeBtn" aria-label="تغییر تم" title="تغییر تم">
         <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
@@ -63,8 +80,10 @@
         <label for="fileInput" class="btn btn-primary" id="btnPickFile" style="cursor:pointer">انتخاب فایل</label>
       </div>
       <div class="file-card" id="fileCard">
-        <div class="file-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <div class="file-card-icon" id="fileCoverWrap">
+          <img id="fileCover" alt="" hidden>
+          <canvas id="fileCoverCanvas" width="64" height="64" hidden></canvas>
+          <svg id="fileCoverFallback" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         </div>
         <div class="file-card-info">
           <div class="file-card-name" id="fileName">—</div>
@@ -86,6 +105,17 @@
     <section class="player-panel" id="playerPanel">
       <div class="player-top">
         <h3>پیش‌نمایش</h3>
+        <div class="speed-wrap">
+          <label for="speedSelect" class="speed-label">سرعت</label>
+          <select id="speedSelect" class="hdr-select" aria-label="سرعت پخش">
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+        </div>
         <div class="mode-switch">
           <button type="button" id="modeOriginal">اصلی</button>
           <button type="button" class="active" id="modeProcessed">پردازش‌شده</button>
@@ -96,6 +126,11 @@
       </div>
       <div class="player-controls">
         <button type="button" class="play-btn" id="playBtn" aria-label="پخش">
+          <span class="play-rings" aria-hidden="true">
+            <span class="ring r1"></span>
+            <span class="ring r2"></span>
+            <span class="ring r3"></span>
+          </span>
           <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         </button>
         <div class="timeline-wrap">
@@ -104,6 +139,44 @@
             <span id="totalTime">00:00</span>
           </div>
           <input type="range" class="seek-track" id="seekBar" min="0" max="100" value="0" step="0.01" aria-label="موقعیت پخش">
+        </div>
+      </div>
+    </section>
+
+    
+    <!-- Dual Track Bar -->
+    <section class="tracks-panel" id="tracksPanel">
+      <div class="track-card active-track" data-track="A" id="trackCardA">
+        <div class="track-head">
+          <span class="track-badge">A</span>
+          <span class="track-name" id="trackNameA">Track A</span>
+          <span class="track-dur" id="trackDurA">—</span>
+        </div>
+        <div class="track-controls">
+          <button type="button" class="icon-btn" id="muteA" title="Mute">M</button>
+          <button type="button" class="icon-btn" id="soloA" title="Solo">S</button>
+          <label class="gain-label">Gain
+            <input type="range" id="gainA" min="0" max="150" value="100" class="gain-slider">
+          </label>
+          <span class="gain-val" id="gainValA">0 dB</span>
+        </div>
+      </div>
+      <div class="track-card" data-track="B" id="trackCardB">
+        <div class="track-head">
+          <span class="track-badge">B</span>
+          <span class="track-name" id="trackNameB">Track B — خالی</span>
+          <span class="track-dur" id="trackDurB">—</span>
+        </div>
+        <div class="track-controls">
+          <label class="btn btn-ghost btn-sm" for="fileInputB" id="btnAddTrackB">+ افزودن فایل</label>
+          <input type="file" id="fileInputB" accept="audio/*" hidden>
+          <button type="button" class="icon-btn" id="muteB" title="Mute" disabled>M</button>
+          <button type="button" class="icon-btn" id="soloB" title="Solo" disabled>S</button>
+          <label class="gain-label">Gain
+            <input type="range" id="gainB" min="0" max="150" value="100" class="gain-slider" disabled>
+          </label>
+          <span class="gain-val" id="gainValB">0 dB</span>
+          <button type="button" class="icon-btn danger" id="removeB" title="حذف" disabled>×</button>
         </div>
       </div>
     </section>

@@ -81,7 +81,7 @@ export async function processOfflineBuffer(audioBuffer, params = {}, onProgress)
   const { processPitchPreserveDuration } = await import('../audio-engine/PitchProcessor.js');
   const cfg = getPitchConfig(params);
   if (onProgress) onProgress(0.3);
-  const pitched = processPitchPreserveDuration(audioBuffer, cfg.pitchRatio, cfg.formantShift);
+  const pitched = await processPitchPreserveDuration(audioBuffer, cfg.pitchRatio, cfg.formantShift, onProgress);
   if (onProgress) onProgress(0.9);
   return pitched;
 }

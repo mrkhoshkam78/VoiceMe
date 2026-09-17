@@ -1,5 +1,5 @@
 /**
- * Audio Editor V1.05.1 – Application (UI layer only) — Professional Vocal Engine
+ * Audio Editor V1.06 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
@@ -54,10 +54,13 @@ class App {
     this._renderSidebar();
     this._bindEvents();
     this._wireEngine();
-    try {
-      if (typeof this._populateExportFormats === 'function') {
-        try { if (typeof this._populateExportFormats === 'function') this._populateExportFormats(); } catch(_){}
+    this.engine.onVocalProgress = (p, label) => {
+      if (p < 1 && this.$.overlay && !this.$.overlay.classList.contains('visible')) {
+        // light indicator only – do not block UI with full overlay for short files
       }
+    };
+    try {
+      if (typeof this._populateExportFormats === 'function') this._populateExportFormats();
     } catch (e) {
       console.warn('[App] export formats init skipped', e);
     }
@@ -153,7 +156,12 @@ class App {
       // export settings (may be injected)
       exportFormat: id('exportFormat'),
       exportChannels: id('exportChannels'),
-      exportSampleRate: id('exportSampleRate')
+      exportSampleRate: id('exportSampleRate'),
+      speedSelect: id('speedSelect'),
+      fileCover: id('fileCover'),
+      fileCoverCanvas: id('fileCoverCanvas'),
+      fileCoverFallback: id('fileCoverFallback'),
+      headerExport: id('headerExport')
     };
   }
 
@@ -221,40 +229,21 @@ class App {
   }
 
   _populateExportFormats() {
-    // Inject export settings into action bar if not present
-    const bar = this.$.actionBar?.querySelector('.action-bar-inner');
-    if (!bar || document.getElementById('exportFormat')) return;
-
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-left:auto;';
+    const sel = document.getElementById('exportFormat');
+    const hdr = document.getElementById('headerExport');
+    if (!sel) return;
     const formats = AudioExporter.availableFormats();
-    wrap.innerHTML = `
-      <select id="exportFormat" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="فرمت خروجی">
-        ${formats.map(f => `<option value="${f.id}">${f.label}</option>`).join('')}
-      </select>
-      <select id="exportBitrate" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="بیت‌ریت MP3">
-        <option value="128">128 kbps</option>
-        <option value="192" selected>192 kbps</option>
-        <option value="256">256 kbps</option>
-        <option value="320">320 kbps</option>
-        <option value="96">96 kbps</option>
-        <option value="64">64 kbps</option>
-      </select>
-      <select id="exportChannels" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="کانال">
-        <option value="2">استریو</option>
-        <option value="1">مونو</option>
-      </select>
-      <select id="exportSampleRate" class="option-chip" style="padding:0.4rem 0.6rem;cursor:pointer;" aria-label="نرخ نمونه‌برداری">
-        <option value="0">اصلی</option>
-        <option value="44100">44100 Hz</option>
-        <option value="48000">48000 Hz</option>
-        <option value="22050">22050 Hz</option>
-      </select>`;
-    bar.insertBefore(wrap, bar.firstChild);
-    this.$.exportFormat = document.getElementById('exportFormat');
+    sel.innerHTML = formats.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+    this.$.exportFormat = sel;
     this.$.exportBitrate = document.getElementById('exportBitrate');
     this.$.exportChannels = document.getElementById('exportChannels');
-    this.$.exportSampleRate = document.getElementById('exportSampleRate');
+    this.$.exportSampleRate = document.getElementById('exportSampleRate'); // may be null
+    this.$.btnExportHdr = document.getElementById('btnExportHdr');
+    this.$.headerExport = hdr;
+    // Keep action bar export in sync if present
+    if (this.$.btnExportHdr) {
+      this.$.btnExportHdr.onclick = () => this._export();
+    }
   }
 
   _bindEvents() {
@@ -345,9 +334,11 @@ class App {
       this._updateValLabel(input, param, value);
       // Live DSP update while playing — no full chain rebuild if effect supports it
       if (this.effectState[id].enabled) {
+        const isVocal = id === 'femaleVoice' || id === 'deepVoice';
+        // Vocal is heavy – longer debounce; live effects update immediately via AudioParam
         this.engine.updateEffectParams(id, { ...this.effectState[id].params });
       }
-    }, 50));
+    }, 120));
 
     on(this.$.controlsContent, 'click', e => {
       const chip = e.target.closest('.option-chip');
@@ -383,7 +374,72 @@ class App {
     });
 
     on(this.$.btnReset, 'click', () => this._resetEffects());
+
+    // Dual track
+    on(document.getElementById('fileInputB'), 'change', async e => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      try {
+        const meta = await this.engine.loadTrackB(f);
+        const nameEl = document.getElementById('trackNameB');
+        const durEl = document.getElementById('trackDurB');
+        if (nameEl) nameEl.textContent = meta.name || 'Track B';
+        if (durEl) durEl.textContent = formatDuration(meta.duration || 0);
+        ['muteB','soloB','gainB','removeB'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = false;
+        });
+        this._toast('success', 'Track B', meta.name || 'بارگذاری شد');
+      } catch (err) {
+        this._toast('error', 'Track B', 'بارگذاری ناموفق');
+      }
+    });
+    on(document.getElementById('removeB'), 'click', () => {
+      this.engine.clearTrackB();
+      const nameEl = document.getElementById('trackNameB');
+      if (nameEl) nameEl.textContent = 'Track B — خالی';
+      const durEl = document.getElementById('trackDurB');
+      if (durEl) durEl.textContent = '—';
+      ['muteB','soloB','gainB','removeB'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = true;
+      });
+    });
+    const bindGain = (id, track, valId) => {
+      on(document.getElementById(id), 'input', e => {
+        const pct = parseFloat(e.target.value) || 0;
+        const linear = pct / 100;
+        this.engine.setTrackGain(track, linear);
+        const db = linear <= 0 ? '-∞' : (20 * Math.log10(linear)).toFixed(1);
+        const v = document.getElementById(valId);
+        if (v) v.textContent = (linear <= 0 ? '-∞' : db) + ' dB';
+      });
+    };
+    bindGain('gainA', 'A', 'gainValA');
+    bindGain('gainB', 'B', 'gainValB');
+    on(document.getElementById('muteA'), 'click', e => {
+      e.currentTarget.classList.toggle('active');
+      this.engine.setTrackMute('A', e.currentTarget.classList.contains('active'));
+    });
+    on(document.getElementById('muteB'), 'click', e => {
+      e.currentTarget.classList.toggle('active');
+      this.engine.setTrackMute('B', e.currentTarget.classList.contains('active'));
+    });
+    on(document.getElementById('soloA'), 'click', e => {
+      e.currentTarget.classList.toggle('active');
+      this.engine.setTrackSolo('A', e.currentTarget.classList.contains('active'));
+    });
+    on(document.getElementById('soloB'), 'click', e => {
+      e.currentTarget.classList.toggle('active');
+      this.engine.setTrackSolo('B', e.currentTarget.classList.contains('active'));
+    });
+
     on(this.$.btnExport, 'click', () => this._export());
+    on(this.$.btnExportHdr, 'click', () => this._export());
+    on(this.$.speedSelect, 'change', e => {
+      const v = parseFloat(e.target.value) || 1;
+      this.engine.setSpeed(v);
+    });
   }
 
   _wireEngine() {
@@ -406,9 +462,14 @@ class App {
   }
 
   _setPlayIcon(playing) {
-    this.$.playIcon.innerHTML = playing
-      ? '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>'
-      : '<path d="M8 5v14l11-7z"/>';
+    if (this.$.playIcon) {
+      this.$.playIcon.innerHTML = playing
+        ? '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>'
+        : '<path d="M8 5v14l11-7z"/>';
+    }
+    if (this.$.playBtn) {
+      this.$.playBtn.classList.toggle('is-playing', !!playing);
+    }
   }
 
   async _handleFile(file) {
@@ -436,6 +497,12 @@ class App {
         `${(file.name.split('.').pop() || '').toUpperCase()} · ${info.sampleRate} Hz · ${info.channels}ch`;
 
       this._enterEditor();
+      if (this.$.headerExport) this.$.headerExport.hidden = false;
+      this._renderCover(info);
+      const tn = document.getElementById('trackNameA');
+      const td = document.getElementById('trackDurA');
+      if (tn) tn.textContent = info.name || 'Track A';
+      if (td) td.textContent = formatDuration(info.duration || 0);
       this.$.playerPanel.classList.add('visible');
       this.$.effectsWorkspace.classList.add('visible');
       this.$.chainBar.classList.add('visible');
@@ -470,6 +537,11 @@ class App {
     await this.engine.dispose();
     this.engine = new AudioEngine();
     this._wireEngine();
+    this.engine.onVocalProgress = (p, label) => {
+      if (p < 1 && this.$.overlay && !this.$.overlay.classList.contains('visible')) {
+        // light indicator only – do not block UI with full overlay for short files
+      }
+    };
     this._initEffectState();
     this.selectedEffect = null;
     this._renderSidebar();

@@ -19,6 +19,7 @@ export class AudioPlayer {
     this.pauseOffset = 0;       // position in source buffer
     this.startCtxTime = 0;      // ctx.currentTime when started
     this.rate = 1;
+    this.speed = 1; // user playback speed (independent of pitch)
     this._endedHandler = null;
     this._raf = null;
     this._seeking = false;
@@ -54,6 +55,21 @@ export class AudioPlayer {
     return clamp(this.pauseOffset + elapsed * this.rate, 0, this.duration);
   }
 
+  setSpeed(s) {
+    this.speed = Math.max(0.5, Math.min(2, s || 1));
+    if (this.isPlaying && this.graph.source) {
+      try {
+        const base = this.graph.playbackRate || 1;
+        this.graph.source.playbackRate.setTargetAtTime(
+          base * this.speed,
+          this.ctxManager.currentTime,
+          0.04
+        );
+        this.rate = base * this.speed;
+      } catch (_) {}
+    }
+  }
+
   async play(fromOffset = null) {
     if (!this.buffer) return;
 
@@ -74,8 +90,9 @@ export class AudioPlayer {
       return;
     }
 
-    this.rate = built.playbackRate;
+    this.rate = built.playbackRate * (this.speed || 1);
     const source = built.source;
+    source.playbackRate.value = this.rate;
 
     const remaining = (this.duration - offset) / this.rate;
 

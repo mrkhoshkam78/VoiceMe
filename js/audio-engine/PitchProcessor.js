@@ -55,14 +55,14 @@ function timeStretch(input, targetLen, frameSize = 1024, hopSynth = 512) {
     // Find best match around expected position (limited search for speed)
     let bestOffset = 0;
     let bestCorr = -Infinity;
-    const searchRadius = Math.min(hopAnalysis, 64);
+    const searchRadius = Math.min(hopAnalysis, 32);
     const expected = inPos;
 
-    for (let off = -searchRadius; off <= searchRadius; off += 4) {
+    for (let off = -searchRadius; off <= searchRadius; off += 8) {
       const pos = Math.max(0, Math.min(maxIn, expected + off));
       let corr = 0;
       // Lightweight correlation on a subset
-      for (let i = 0; i < frameSize; i += 8) {
+      for (let i = 0; i < frameSize; i += 16) {
         corr += input[pos + i] * (outPos > 0 ? out[outPos + i] || 0 : input[pos + i]);
       }
       if (corr > bestCorr) {
@@ -118,7 +118,7 @@ function applyFormantTilt(channel, formantShift, sampleRate) {
  * @param {number} formantShift -1..+1 (used for guidance, real formant via EQ)
  * @returns {AudioBuffer}
  */
-export function processPitchPreserveDuration(buffer, pitchRatio = 1.0, formantShift = 0) {
+export async function processPitchPreserveDuration(buffer, pitchRatio = 1.0, formantShift = 0, onProgress) {
   if (!buffer || Math.abs(pitchRatio - 1) < 0.008) {
     return buffer;
   }
@@ -126,7 +126,7 @@ export function processPitchPreserveDuration(buffer, pitchRatio = 1.0, formantSh
   const channels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const originalLen = buffer.length;
-  const targetLen = originalLen; // always preserve duration
+  const targetLen = originalLen;
 
   const out = new AudioBuffer({
     length: targetLen,
@@ -135,16 +135,33 @@ export function processPitchPreserveDuration(buffer, pitchRatio = 1.0, formantSh
   });
 
   for (let ch = 0; ch < channels; ch++) {
+    if (onProgress) onProgress((ch) / channels);
+    // Yield to UI between channels
+    await new Promise(r => setTimeout(r, 0));
     const input = buffer.getChannelData(ch);
-    // 1) Resample → changes pitch AND length
     const pitched = resampleChannel(input, pitchRatio);
-    // 2) Time-stretch back to original length (keeps the new pitch)
+    await new Promise(r => setTimeout(r, 0));
     const stretched = timeStretch(pitched, targetLen);
-    // 3) Optional formant tilt (lightweight)
     const final = applyFormantTilt(stretched, formantShift, sampleRate);
     out.getChannelData(ch).set(final);
   }
+  if (onProgress) onProgress(1);
+  return out;
+}
 
+/** Sync wrapper for places that cannot await */
+export function processPitchPreserveDurationSync(buffer, pitchRatio = 1.0, formantShift = 0) {
+  if (!buffer || Math.abs(pitchRatio - 1) < 0.008) return buffer;
+  const channels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const targetLen = buffer.length;
+  const out = new AudioBuffer({ length: targetLen, numberOfChannels: channels, sampleRate });
+  for (let ch = 0; ch < channels; ch++) {
+    const input = buffer.getChannelData(ch);
+    const pitched = resampleChannel(input, pitchRatio);
+    const stretched = timeStretch(pitched, targetLen);
+    out.getChannelData(ch).set(applyFormantTilt(stretched, formantShift, sampleRate));
+  }
   return out;
 }
 
