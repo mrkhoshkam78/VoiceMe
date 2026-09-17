@@ -1,5 +1,5 @@
 /**
- * Audio Editor V2.1.0 – Application (UI layer only) — Professional Vocal Engine
+ * Audio Editor V2.2.0 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
@@ -300,7 +300,7 @@ class App {
       r: 0.12 + Math.random() * 0.18,
       vx: (Math.random() - 0.5) * 0.00025,
       vy: (Math.random() - 0.5) * 0.00025,
-      hue: (i * 55 + 200) % 360
+      hue: [265, 190, 300, 250, 175][i % 5]
     }));
 
     const resize = () => {
@@ -1049,7 +1049,7 @@ class App {
 
       // Organic bezier wave
       ctx.beginPath();
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--waveform').trim() || (theme === 'light' ? '#2563eb' : '#60a5fa');
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--waveform').trim() || (theme === 'light' ? '#2563eb' : '#a78bfa');
       ctx.lineWidth = 2.2;
       ctx.lineJoin = 'round';
 

@@ -1,13 +1,14 @@
-# VoiceMe V2.1.0 — Responsive Studio · Real-Time Audio
+# VoiceMe V2.2.0 — Visual Design Only
 
-## Highlights
-- **Laptop-first layout**: compact spacing, side panel stacks under 1280px, short-height media query
-- **Hierarchical Menu**: Studio / Vocal / Effects / Export with submenus (replaces crowded header nav)
-- **Animated studio background**: soft multi-color blobs, reduced on mobile, respects prefers-reduced-motion
-- **Track-card Preview**: waveform-centered audio workspace
-- **Audio quality**: inherits V2.0 single-pass render + peak limiting + soft compressors
+Premium Vocal Studio identity. **No audio logic changes.**
 
-## Run
-```bash
-npx serve .
-```
+## Visual
+- Palette: Deep Navy + Violet + Cyan + Magenta
+- Glass surfaces on cards/panels
+- Cinematic landing with SVG waves + rings
+- Hierarchical menu micro-animations
+- Studio ambient blobs (violet/cyan)
+- Unified button / slider / effect-item states
+
+## Unchanged
+- AudioEngine, DSP, Effects, Export, AutoTune behavior
