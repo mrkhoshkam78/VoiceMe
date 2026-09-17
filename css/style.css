@@ -2698,3 +2698,103 @@ html[dir="rtl"] .nav-drawer {
   gap: 0.75rem;
 }
 .header .logo { flex: 1; min-width: 0; }
+
+/* ========== V2.3.1 Menu fix + Viz + Pulse ========== */
+
+/* [hidden] must not block open state */
+.nav-drawer[hidden],
+.nav-overlay[hidden] {
+  display: none !important;
+}
+.nav-drawer:not([hidden]) {
+  display: flex !important;
+}
+.nav-overlay:not([hidden]) {
+  display: block !important;
+}
+
+/* Ensure hamburger always visible in header */
+.hamburger-btn {
+  display: flex !important;
+  z-index: 50;
+  position: relative;
+}
+
+body.menu-open {
+  overflow: hidden;
+}
+
+/* Larger, brighter visualizer */
+.player-panel.track-card .viz-area,
+.viz-area {
+  height: clamp(110px, 18vh, 160px) !important;
+  min-height: 110px;
+  box-shadow:
+    inset 0 0 50px rgba(139, 92, 246, 0.12),
+    inset 0 0 80px rgba(34, 211, 238, 0.06) !important;
+  border-color: rgba(167, 139, 250, 0.28) !important;
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(139, 92, 246, 0.2), transparent 55%),
+    radial-gradient(ellipse at 20% 0%, rgba(34, 211, 238, 0.1), transparent 40%),
+    var(--bg-secondary, var(--bg)) !important;
+}
+
+/* Playing pulse on track card */
+.player-panel.track-card.is-pulsing {
+  animation: cardPulse 2.4s ease-in-out infinite;
+  border-color: rgba(167, 139, 250, 0.45) !important;
+}
+.player-panel.track-card.is-pulsing::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(120deg,
+    rgba(139, 92, 246, 0.15),
+    rgba(34, 211, 238, 0.1),
+    rgba(232, 121, 249, 0.12),
+    rgba(139, 92, 246, 0.15));
+  background-size: 300% 300%;
+  animation: pulseGradient 3s ease infinite;
+  z-index: 0;
+  opacity: 0.85;
+  mix-blend-mode: screen;
+}
+.player-panel.track-card.is-pulsing > * {
+  position: relative;
+  z-index: 1;
+}
+@keyframes cardPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(139, 92, 246, 0.35),
+      0 4px 20px rgba(0,0,0,0.25),
+      0 0 24px rgba(139, 92, 246, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(139, 92, 246, 0.08),
+      0 8px 28px rgba(0,0,0,0.3),
+      0 0 36px rgba(34, 211, 238, 0.2);
+  }
+}
+@keyframes pulseGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-panel.track-card.is-pulsing,
+  .player-panel.track-card.is-pulsing::after {
+    animation: none !important;
+  }
+}
+
+@media (max-height: 800px) and (min-width: 900px) {
+  .viz-area {
+    height: 100px !important;
+    min-height: 96px;
+  }
+}

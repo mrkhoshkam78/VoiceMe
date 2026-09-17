@@ -194,7 +194,11 @@ class App {
     document.documentElement.setAttribute('lang', this.lang);
     document.documentElement.setAttribute('dir', this.lang === 'fa' ? 'rtl' : 'ltr');
     const sel = document.getElementById('langSelect');
-    if (sel) sel.value = this.lang;
+    if (sel) {
+      sel.value = this.lang;
+      // re-bind change in case DOM ready order differs
+      sel.onchange = (e) => this._setLang(e.target.value);
+    }
     this._applyI18n();
   }
 
@@ -212,76 +216,115 @@ class App {
       const val = t(key, this.lang);
       if (val) el.textContent = val;
     });
-    // Common dynamic labels
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      const val = t(key, this.lang);
+      if (val) el.setAttribute('placeholder', val);
+    });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+      const key = el.getAttribute('data-i18n-aria');
+      const val = t(key, this.lang);
+      if (val) el.setAttribute('aria-label', val);
+    });
+    // Dynamic status
     const st = document.getElementById('playerStatus');
-    if (st && !this.engine?.isPlaying) st.textContent = t('ready', this.lang);
+    if (st) {
+      st.textContent = this.engine?.isPlaying ? t('playing', this.lang) : t('ready', this.lang);
+    }
+    // Drawer title stays brand
+    const drawerTitle = document.querySelector('.nav-drawer-title');
+    if (drawerTitle) drawerTitle.textContent = 'VoiceMe';
+    // Re-render sidebar labels via effect meta (names already FA in registry)
+    try { this._renderSidebar?.(); } catch (_) {}
+    try { this._updateSideStatus?.(); } catch (_) {}
   }
 
   _tt(key) { return t(key, this.lang || 'fa'); }
 
 
   _initStudioMenu() {
-    const trigger = document.getElementById('menuTrigger');
-    const panel = document.getElementById('menuPanel');
-    const root = document.getElementById('menuRoot');
-    if (!trigger || !panel) return;
+    const btn = document.getElementById('hamburgerBtn');
+    const drawer = document.getElementById('navDrawer');
+    const overlay = document.getElementById('navOverlay');
+    const closeBtn = document.getElementById('navClose');
+    if (!btn || !drawer) {
+      console.warn('[Menu] hamburger elements missing');
+      return;
+    }
 
-    const closeAll = () => {
-      panel.hidden = true;
-      trigger.setAttribute('aria-expanded', 'false');
-      panel.querySelectorAll('.submenu').forEach(s => { s.hidden = true; });
+    const openMenu = () => {
+      drawer.hidden = false;
+      if (overlay) overlay.hidden = false;
+      // force reflow then animate
+      void drawer.offsetWidth;
+      drawer.classList.add('open');
+      overlay?.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      btn.classList.add('is-open');
+      document.body.classList.add('menu-open');
     };
 
-    trigger.addEventListener('click', (e) => {
+    const closeMenu = () => {
+      drawer.classList.remove('open');
+      overlay?.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.classList.remove('is-open');
+      document.body.classList.remove('menu-open');
+      const onEnd = () => {
+        drawer.hidden = true;
+        if (overlay) overlay.hidden = true;
+        drawer.removeEventListener('transitionend', onEnd);
+      };
+      drawer.addEventListener('transitionend', onEnd);
+      // fallback
+      setTimeout(() => {
+        if (!drawer.classList.contains('open')) {
+          drawer.hidden = true;
+          if (overlay) overlay.hidden = true;
+        }
+      }, 320);
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      const open = panel.hidden;
-      if (open) {
-        panel.hidden = false;
-        trigger.setAttribute('aria-expanded', 'true');
-      } else closeAll();
+      if (drawer.classList.contains('open')) closeMenu();
+      else openMenu();
+    });
+    closeBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeMenu();
+    });
+    overlay?.addEventListener('click', () => closeMenu());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drawer.classList.contains('open')) closeMenu();
     });
 
-    document.addEventListener('click', (e) => {
-      if (root && !root.contains(e.target)) closeAll();
-    });
-
-    panel.querySelectorAll('.menu-item.has-sub').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = btn.getAttribute('data-sub');
-        const sub = panel.querySelector(`[data-subpanel="${id}"]`);
-        if (!sub) return;
-        const was = sub.hidden;
-        panel.querySelectorAll('.submenu').forEach(s => { s.hidden = true; });
-        sub.hidden = !was ? true : false;
-      });
-    });
-
-    panel.querySelectorAll('.menu-item[data-action]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const action = btn.getAttribute('data-action');
+    drawer.querySelectorAll('[data-action]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        const action = el.getAttribute('data-action');
         if (action === 'scroll') {
-          const t = document.getElementById(btn.getAttribute('data-target'));
+          const t = document.getElementById(el.getAttribute('data-target'));
           if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else if (action === 'fx') {
-          const id = btn.getAttribute('data-fx');
-          if (id && this.effectState[id] !== undefined) {
-            this._selectEffect(id);
-            const t = document.getElementById('effectsWorkspace');
-            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const id = el.getAttribute('data-fx');
+          if (id && this.effectState?.[id] !== undefined) {
+            if (typeof this._selectEffect === 'function') this._selectEffect(id);
+            document.getElementById('effectsWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         } else if (action === 'export') {
-          const fmt = btn.getAttribute('data-format');
+          const fmt = el.getAttribute('data-format');
           const sel = document.getElementById('exportFormat');
           if (sel && fmt) {
-            // ensure option exists
-            const opt = [...sel.options].find(o => o.value === fmt || o.value.includes(fmt));
+            const opt = [...sel.options].find(o => o.value === fmt || String(o.value).includes(fmt));
             if (opt) sel.value = opt.value;
           }
-          this._export();
+          if (typeof this._export === 'function') this._export();
+        } else if (action === 'theme') {
+          if (typeof this._toggleTheme === 'function') this._toggleTheme();
         }
-        closeAll();
+        closeMenu();
       });
     });
   }
@@ -661,6 +704,8 @@ class App {
     if (this.$.playBtn) {
       this.$.playBtn.classList.toggle('is-playing', !!playing);
     }
+    const panel = this.$.playerPanel || document.getElementById('playerPanel');
+    if (panel) panel.classList.toggle('is-pulsing', !!playing);
     const st = this.$.playerStatus || document.getElementById('playerStatus');
     if (st) {
       st.textContent = playing ? 'در حال پخش' : 'آماده';
