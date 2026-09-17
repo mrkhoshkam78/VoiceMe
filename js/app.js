@@ -208,7 +208,7 @@ class App {
     }
   }
 
-  _populateExportFormats_populateExportFormats() {
+  _populateExportFormats() {
     // Inject export settings into action bar if not present
     const bar = this.$.actionBar?.querySelector('.action-bar-inner');
     if (!bar || document.getElementById('exportFormat')) return;
