@@ -122,15 +122,22 @@ class App {
   _enterEditor() {
     if (this.$.landing) {
       this.$.landing.classList.add('hidden');
+      this.$.landing.style.pointerEvents = 'none';
       setTimeout(() => {
-        if (this.$.landing) this.$.landing.style.display = 'none';
-      }, 650);
+        if (this.$.landing) {
+          this.$.landing.style.display = 'none';
+          this.$.landing.setAttribute('aria-hidden', 'true');
+        }
+      }, 500);
     }
     if (this.$.mainApp) {
-      this.$.mainApp.style.display = '';
+      this.$.mainApp.style.display = 'flex';
       this.$.mainApp.classList.add('entering');
     }
-    if (this._landingRaf) cancelAnimationFrame(this._landingRaf);
+    if (this._landingRaf) {
+      cancelAnimationFrame(this._landingRaf);
+      this._landingRaf = null;
+    }
   }
 
 
@@ -498,15 +505,16 @@ class App {
 
       this._enterEditor();
       if (this.$.headerExport) this.$.headerExport.hidden = false;
-      this._renderCover(info);
+      // Show editor panels FIRST so UI never stays blank
+      if (this.$.playerPanel) this.$.playerPanel.classList.add('visible');
+      if (this.$.effectsWorkspace) this.$.effectsWorkspace.classList.add('visible');
+      if (this.$.chainBar) this.$.chainBar.classList.add('visible');
+      if (this.$.actionBar) this.$.actionBar.classList.add('visible');
+      try { this._renderCover(info); } catch (e) { console.warn(e); }
       const tn = document.getElementById('trackNameA');
       const td = document.getElementById('trackDurA');
       if (tn) tn.textContent = info.name || 'Track A';
       if (td) td.textContent = formatDuration(info.duration || 0);
-      this.$.playerPanel.classList.add('visible');
-      this.$.effectsWorkspace.classList.add('visible');
-      this.$.chainBar.classList.add('visible');
-      this.$.actionBar.classList.add('visible');
       try { if (typeof this._populateExportFormats === 'function') this._populateExportFormats(); } catch(_){}
 
       this.$.totalTime.textContent = formatDuration(info.duration);
@@ -893,6 +901,42 @@ class App {
   _hideOverlay() {
     this.$.overlay.classList.remove('visible');
     this.$.progressFill.style.width = '0%';
+  }
+
+
+  _renderCover(info) {
+    try {
+      const canvas = this.$.fileCoverCanvas || document.getElementById('fileCoverCanvas');
+      const img = this.$.fileCover || document.getElementById('fileCover');
+      const fallback = this.$.fileCoverFallback || document.getElementById('fileCoverFallback');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width || 64;
+      const h = canvas.height || 64;
+      const name = (info && info.name) || 'audio';
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+      const h1 = hash % 360;
+      const h2 = (hash * 7) % 360;
+      const g = ctx.createLinearGradient(0, 0, w, h);
+      g.addColorStop(0, `hsl(${h1}, 70%, 45%)`);
+      g.addColorStop(1, `hsl(${h2}, 65%, 30%)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const y = h / 2 + Math.sin(x * 0.2 + hash) * 8 + Math.sin(x * 0.08) * 5;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      canvas.hidden = false;
+      if (img) img.hidden = true;
+      if (fallback) fallback.style.display = 'none';
+    } catch (e) {
+      console.warn('[cover]', e);
+    }
   }
 
   _toast(type, title, msg) {
