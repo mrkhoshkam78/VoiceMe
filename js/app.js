@@ -321,8 +321,10 @@ class App {
             if (opt) sel.value = opt.value;
           }
           if (typeof this._export === 'function') this._export();
-        } else if (action === 'theme') {
-          if (typeof this._toggleTheme === 'function') this._toggleTheme();
+        } else if (action === 'theme' || action === 'theme-dark' || action === 'theme-light') {
+          if (action === 'theme-dark') this._setTheme('dark');
+          else if (action === 'theme-light') this._setTheme('light');
+          else if (typeof this._toggleTheme === 'function') this._toggleTheme();
         }
         closeMenu();
       });
@@ -385,19 +387,24 @@ class App {
     this._studioBgRaf = raf;
   }
 
+  _setTheme(theme) {
+    const next = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('ae-theme', next);
+    document.documentElement.setAttribute('data-theme-name', next === 'dark' ? 'nebula' : 'daylight');
+  }
+
   _initTheme() {
-    const saved = localStorage.getItem('ae-theme') || 'light'; // V2 default Light
-    document.documentElement.setAttribute('data-theme', saved);
+    // Nebula (dark) is the primary identity; Daylight (light) is optional
+    const saved = localStorage.getItem('ae-theme') || 'dark';
+    const theme = saved === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme-name', theme === 'dark' ? 'nebula' : 'daylight');
   }
 
   _toggleTheme() {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('ae-theme', next);
-    // Force one viz frame with new tokens
-    if (this.engine?.isPlaying) {
-      /* continuous loop picks new CSS vars automatically */
-    }
+    const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    this._setTheme(cur === 'dark' ? 'light' : 'dark');
   }
 
   _initEffectState() {

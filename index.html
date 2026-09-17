@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl" data-theme="light">
+<html lang="fa" dir="rtl" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="VoiceMe – Professional Vocal Studio. Vocal Changer · Music Maker.">
-  <title>VoiceMe V2.3.1 — Studio Menu · AutoTune Profiles · Dotted Visualizer</title>
+  <title>VoiceMe V2.3.2 — Studio Menu · AutoTune Profiles · Dotted Visualizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,7 +20,7 @@
         <h1>VoiceMe</h1>
         <span class="brand-sub" data-i18n="brand_sub">Vocal Changer · Music Maker</span>
       </div>
-      <span class="version-badge">V2.3.1</span>
+      <span class="version-badge">V2.3.2</span>
     </div>
 
     
@@ -29,49 +29,7 @@
       <span class="hb-line"></span>
       <span class="hb-line"></span>
     </button>
-
-    <div class="nav-overlay" id="navOverlay" hidden></div>
-    <aside class="nav-drawer" id="navDrawer" role="dialog" aria-modal="true" aria-label="منوی اصلی" hidden>
-      <div class="nav-drawer-head">
-        <span class="nav-drawer-title">VoiceMe</span>
-        <button type="button" class="nav-close" id="navClose" aria-label="بستن">×</button>
-      </div>
-      <nav class="nav-drawer-body">
-        <details class="nav-group" open>
-          <summary>استودیو</summary>
-          <button type="button" class="nav-link-item" data-action="scroll" data-target="playerPanel">پیش‌نمایش</button>
-          <button type="button" class="nav-link-item" data-action="scroll" data-target="tracksPanel">ترک‌ها</button>
-          <button type="button" class="nav-link-item" data-action="scroll" data-target="effectsWorkspace">افکت‌ها</button>
-        </details>
-        <details class="nav-group">
-          <summary>افکت‌های صوتی</summary>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="femaleVoice">صدای زنانه</button>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="deepVoice">صدای مردانه</button>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="bassBoost">Bass</button>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="echo">Echo</button>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="studio">استودیو</button>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="improveQuality">بهبود کیفیت</button>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="noiseReduction">کاهش نویز</button>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="breathSibilance">نفس و سیبیلانس</button>
-        </details>
-        <details class="nav-group">
-          <summary>AutoTune</summary>
-          <button type="button" class="nav-link-item" data-action="fx" data-fx="autotune">باز کردن AutoTune</button>
-        </details>
-        <details class="nav-group">
-          <summary>خروجی (Export)</summary>
-          <button type="button" class="nav-link-item" data-action="export" data-format="wav">خروجی WAV</button>
-          <button type="button" class="nav-link-item" data-action="export" data-format="mp3">خروجی MP3</button>
-          <button type="button" class="nav-link-item" data-action="export" data-format="flac">خروجی FLAC</button>
-        </details>
-        <details class="nav-group">
-          <summary>تنظیمات</summary>
-          <button type="button" class="nav-link-item" data-action="theme">تغییر تم</button>
-        </details>
-      </nav>
-    </aside>
-
-    <div class="header-actions" id="headerActions">
+<div class="header-actions" id="headerActions">
       <select id="langSelect" class="hdr-select lang-select" aria-label="Language">
         <option value="fa">فارسی</option>
         <option value="en">English</option>
@@ -333,5 +291,47 @@
     }
   }, 2000);
 </script>
+<div class="nav-overlay" id="navOverlay" hidden></div>
+    <aside class="nav-drawer" id="navDrawer" role="dialog" aria-modal="true" aria-label="منوی اصلی" hidden>
+      <div class="nav-drawer-head">
+        <span class="nav-drawer-title">VoiceMe</span>
+        <button type="button" class="nav-close" id="navClose" aria-label="بستن">×</button>
+      </div>
+      <nav class="nav-drawer-body">
+        <details class="nav-group" open>
+          <summary>استودیو</summary>
+          <button type="button" class="nav-link-item" data-action="scroll" data-target="playerPanel">پیش‌نمایش</button>
+          <button type="button" class="nav-link-item" data-action="scroll" data-target="tracksPanel">ترک‌ها</button>
+          <button type="button" class="nav-link-item" data-action="scroll" data-target="effectsWorkspace">افکت‌ها</button>
+        </details>
+        <details class="nav-group">
+          <summary>افکت‌های صوتی</summary>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="femaleVoice">صدای زنانه</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="deepVoice">صدای مردانه</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="bassBoost">Bass</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="echo">Echo</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="studio">استودیو</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="improveQuality">بهبود کیفیت</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="noiseReduction">کاهش نویز</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="breathSibilance">نفس و سیبیلانس</button>
+        </details>
+        <details class="nav-group">
+          <summary>AutoTune</summary>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="autotune">باز کردن AutoTune</button>
+        </details>
+        <details class="nav-group">
+          <summary>خروجی (Export)</summary>
+          <button type="button" class="nav-link-item" data-action="export" data-format="wav">خروجی WAV</button>
+          <button type="button" class="nav-link-item" data-action="export" data-format="mp3">خروجی MP3</button>
+          <button type="button" class="nav-link-item" data-action="export" data-format="flac">خروجی FLAC</button>
+        </details>
+        <details class="nav-group">
+          <summary data-i18n="nav_settings">تنظیمات</summary>
+          <button type="button" class="nav-link-item" data-action="theme-dark" data-i18n="theme_nebula">تم Nebula (تاریک)</button>
+          <button type="button" class="nav-link-item" data-action="theme-light" data-i18n="theme_daylight">تم Daylight (روشن)</button>
+          <button type="button" class="nav-link-item" data-action="theme" data-i18n="theme_toggle">جابه‌جایی تم</button>
+        </details>
+      </nav>
+    </aside>
 </body>
 </html>

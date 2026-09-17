@@ -59,7 +59,11 @@ export const STRINGS = {
     fx_female: 'صدای زنانه',
     fx_male: 'صدای مردانه',
     fx_autotune: 'AutoTune',
-    fx_breath: 'نفس و سیبیلانس'
+    fx_breath: 'نفس و سیبیلانس',
+    theme_nebula: 'تم Nebula (تاریک)',
+    theme_daylight: 'تم Daylight (روشن)',
+    theme_toggle: 'جابه‌جایی تم',
+    nav_settings: 'تنظیمات'
   },
   en: {
     brand_sub: 'Vocal Changer · Music Maker',
@@ -120,7 +124,11 @@ export const STRINGS = {
     fx_female: 'Female Voice',
     fx_male: 'Male Voice',
     fx_autotune: 'AutoTune',
-    fx_breath: 'Breath & Sibilance'
+    fx_breath: 'Breath & Sibilance',
+    theme_nebula: 'Nebula theme (dark)',
+    theme_daylight: 'Daylight theme (light)',
+    theme_toggle: 'Toggle theme',
+    nav_settings: 'Settings'
   }
 };
 
