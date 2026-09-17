@@ -61,12 +61,23 @@ export class AudioExporter {
     }
 
     if (format === 'flac') {
-      if (onProgress) onProgress(0.2, 'رمزگذاری FLAC واقعی (lossless)...');
-      const blob = this._encodeFlac(work, options.bitDepth || 16);
-      const name = `${baseName}_edited.flac`;
-      downloadBlob(blob, name);
-      if (onProgress) onProgress(1, 'دانلود شد');
-      return name;
+      try {
+        if (onProgress) onProgress(0.2, 'رمزگذاری FLAC واقعی (lossless)...');
+        const blob = this._encodeFlac(work, options.bitDepth || 16);
+        if (!blob || blob.size < 100) throw new Error('FLAC_EMPTY');
+        const name = `${baseName}_edited.flac`;
+        downloadBlob(blob, name);
+        if (onProgress) onProgress(1, 'دانلود شد');
+        return name;
+      } catch (err) {
+        console.warn('[Exporter] FLAC failed, falling back to WAV', err);
+        if (onProgress) onProgress(0.6, 'FLAC ناموفق – ساخت WAV...');
+        const blob = audioBufferToWav(work);
+        const name = `${baseName}_edited.wav`;
+        downloadBlob(blob, name);
+        if (onProgress) onProgress(1, 'دانلود شد (WAV – جایگزین FLAC)');
+        return name;
+      }
     }
 
     if (format === 'webm' || format === 'ogg') {

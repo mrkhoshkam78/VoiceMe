@@ -1,5 +1,5 @@
 /**
- * Audio Editor V1.05 – Application (UI layer only) — Professional Vocal Engine
+ * Audio Editor V1.05.1 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
@@ -54,8 +54,20 @@ class App {
     this._renderSidebar();
     this._bindEvents();
     this._wireEngine();
-    this._populateExportFormats();
-    this._initLanding();
+    try {
+      if (typeof this._populateExportFormats === 'function') {
+        try { if (typeof this._populateExportFormats === 'function') this._populateExportFormats(); } catch(_){}
+      }
+    } catch (e) {
+      console.warn('[App] export formats init skipped', e);
+    }
+    try {
+      if (typeof this._initLanding === 'function') {
+        this._initLanding();
+      }
+    } catch (e) {
+      console.warn('[App] landing init skipped', e);
+    }
   }
 
   _initLanding() {
@@ -428,7 +440,7 @@ class App {
       this.$.effectsWorkspace.classList.add('visible');
       this.$.chainBar.classList.add('visible');
       this.$.actionBar.classList.add('visible');
-      this._populateExportFormats();
+      try { if (typeof this._populateExportFormats === 'function') this._populateExportFormats(); } catch(_){}
 
       this.$.totalTime.textContent = formatDuration(info.duration);
       this.$.seekBar.max = info.duration;
