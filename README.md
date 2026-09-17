@@ -1,11 +1,14 @@
-# VoiceMe V1.07 — Responsive, Theme & Audio Quality
+# VoiceMe V1.07.1
 
-## What changed
-- **Responsive**: mobile breakpoints 360/480/720/860 — dual tracks stack, effects single column, header export wraps, safe-area for action bar
-- **Theme**: expanded design tokens (`--waveform`, `--bg-secondary`, `--surface-elevated`, …); visualizer reads CSS variables; fewer hard-coded colors
-- **Audio quality**: softer Girl/Female/Woman/Male pitch ratios; Bass with high-pass protection + milder boost; Echo with wet HPF + capped feedback
-- **Preview**: status chip (Ready/Playing), theme-aware waveform colors
-- **Descriptions**: clearer Persian copy for effects
+Professional Female Vocal · Breath & Sibilance · AutoTune Cache · Light UI
+
+## New / Upgraded
+- **Female Voice**: distinct Girl / Female / Woman presets (pitch + formant + body/air EQ)
+- **Breath & Sibilance**: dynamic multi-band de-esser + breath shelf (not static EQ)
+- **AutoTune**: WeakMap analysis cache + adaptive hop for long files
+- **Default theme**: Light (unless user previously chose Dark)
+- **Side panel**: file meta + active effects
+- **Seekbar**: rounded modern track/thumb
 
 ## Run
 ```bash

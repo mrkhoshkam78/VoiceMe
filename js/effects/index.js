@@ -1,9 +1,10 @@
 /**
- * Effects registry V1.05 – categorized
+ * Effects registry V1.07.1 – categorized + Breath/Sibilance
  */
 import * as femaleVoice from './femaleVoice.js';
 import * as deepVoice from './deepVoice.js';
 import * as autotune from './autotune.js';
+import * as breathSibilance from './breathSibilance.js';
 import * as speaker from './speaker.js';
 import * as police from './police.js';
 import * as echo from './echo.js';
@@ -14,7 +15,7 @@ import * as noiseReduction from './noiseReduction.js';
 import * as volume from './volume.js';
 
 const modules = [
-  femaleVoice, deepVoice, autotune,
+  femaleVoice, deepVoice, autotune, breathSibilance,
   speaker, police, echo, studio,
   bassBoost, improveQuality, noiseReduction, volume
 ];
@@ -32,14 +33,21 @@ modules.forEach(mod => {
   };
 });
 
-/** Ordered list for UI + processing priority */
+/**
+ * Processing priority order (engine chain):
+ * noise → breath/sib → vocal pitch character → autotune → tone → space → volume
+ */
 export const effectOrder = [
-  'femaleVoice', 'deepVoice', 'autotune',
-  'speaker', 'police', 'echo', 'studio',
-  'bassBoost', 'improveQuality', 'noiseReduction', 'volume'
+  'noiseReduction',
+  'breathSibilance',
+  'femaleVoice', 'deepVoice',
+  'autotune',
+  'bassBoost', 'improveQuality',
+  'speaker', 'police',
+  'echo', 'studio',
+  'volume'
 ];
 
-/** Categories for redesigned Effects List */
 export const effectCategories = [
   {
     id: 'voice',
@@ -49,7 +57,7 @@ export const effectCategories = [
   {
     id: 'correction',
     label: 'تصحیح (Correction)',
-    ids: ['autotune', 'noiseReduction']
+    ids: ['autotune', 'breathSibilance', 'noiseReduction']
   },
   {
     id: 'tone',

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="VoiceMe – Professional Vocal Engine, AutoTune, Export & Immersive UI">
-  <title>VoiceMe V1.07 — Professional Vocal Engine</title>
+  <title>VoiceMe V1.07.1 — Female Vocal & Breath Control</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
       </div>
       <h1>VoiceMe</h1>
-      <span class="version-badge">V1.07</span>
+      <span class="version-badge">V1.07.1</span>
     </div>
     <div class="header-actions" id="headerActions">
       <div class="header-export" id="headerExport" hidden>
@@ -69,6 +69,9 @@
   </section>
 
   <main class="main" id="mainApp" style="display:none">
+    <button type="button" class="btn btn-ghost btn-sm side-toggle" id="btnSideToggle" aria-label="اطلاعات فایل">اطلاعات فایل</button>
+    <div class="editor-layout">
+    <div class="editor-main">
     <!-- Upload -->
     <section class="upload-zone" id="uploadZone">
       <div class="upload-empty">
@@ -204,6 +207,25 @@
         <span class="chain-empty-msg">هیچ افکتی فعال نیست</span>
       </div>
     </section>
+    </div><!-- /.editor-main -->
+
+    <aside class="side-panel" id="sidePanel" hidden>
+      <div class="side-panel-head">
+        <h3>اطلاعات فایل</h3>
+        <button type="button" class="icon-btn" id="btnSideClose" aria-label="بستن" onclick="document.getElementById('sidePanel').classList.remove('open')">×</button>
+      </div>
+      <dl class="side-meta">
+        <div><dt>نام</dt><dd id="sideFileName">—</dd></div>
+        <div><dt>فرمت</dt><dd id="sideFormat">—</dd></div>
+        <div><dt>حجم</dt><dd id="sideSize">—</dd></div>
+        <div><dt>مدت</dt><dd id="sideDuration">—</dd></div>
+        <div><dt>Sample Rate</dt><dd id="sideRate">—</dd></div>
+        <div><dt>کانال</dt><dd id="sideChannels">—</dd></div>
+        <div><dt>افکت‌ها</dt><dd id="sideEffects">هیچ</dd></div>
+        <div><dt>AutoTune</dt><dd id="sideAutotune">خاموش</dd></div>
+      </dl>
+    </aside>
+    </div><!-- /.editor-layout -->
   </main>
 
   <!-- Action Bar -->

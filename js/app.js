@@ -1,5 +1,5 @@
 /**
- * Audio Editor V1.07 – Application (UI layer only) — Professional Vocal Engine
+ * Audio Editor V1.07.1 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
@@ -165,6 +165,16 @@ class App {
       exportChannels: id('exportChannels'),
       exportSampleRate: id('exportSampleRate'),
       speedSelect: id('speedSelect'),
+      sidePanel: id('sidePanel'),
+      sideFileName: id('sideFileName'),
+      sideFormat: id('sideFormat'),
+      sideSize: id('sideSize'),
+      sideDuration: id('sideDuration'),
+      sideRate: id('sideRate'),
+      sideChannels: id('sideChannels'),
+      sideEffects: id('sideEffects'),
+      sideAutotune: id('sideAutotune'),
+      btnSideToggle: id('btnSideToggle'),
       playerStatus: id('playerStatus'),
       fileCover: id('fileCover'),
       fileCoverCanvas: id('fileCoverCanvas'),
@@ -174,7 +184,7 @@ class App {
   }
 
   _initTheme() {
-    const saved = localStorage.getItem('ae-theme') || 'dark';
+    const saved = localStorage.getItem('ae-theme') || 'light';
     document.documentElement.setAttribute('data-theme', saved);
   }
 
@@ -262,6 +272,11 @@ class App {
     const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 
     on(this.$.themeBtn, 'click', () => this._toggleTheme());
+    on(this.$.btnSideToggle, 'click', () => {
+      const p = this.$.sidePanel;
+      if (!p) return;
+      p.classList.toggle('open');
+    });
 
     // label[for=fileInput] already opens the picker natively; stop zone double-handling
     on(this.$.btnPickFile, 'click', e => { e.stopPropagation(); });
@@ -520,7 +535,8 @@ class App {
       if (this.$.effectsWorkspace) this.$.effectsWorkspace.classList.add('visible');
       if (this.$.chainBar) this.$.chainBar.classList.add('visible');
       if (this.$.actionBar) this.$.actionBar.classList.add('visible');
-      try { this._renderCover(info); } catch (e) { console.warn(e); }
+      try { this._renderCover(info);
+      this._updateSideInfo(info, file); } catch (e) { console.warn(e); }
       const tn = document.getElementById('trackNameA');
       const td = document.getElementById('trackDurA');
       if (tn) tn.textContent = info.name || 'Track A';
@@ -571,6 +587,10 @@ class App {
     this.$.effectsWorkspace.classList.remove('visible');
     this.$.chainBar.classList.remove('visible');
     this.$.actionBar.classList.remove('visible');
+    if (this.$.sidePanel) {
+      this.$.sidePanel.hidden = true;
+      this.$.sidePanel.classList.remove('open');
+    }
     this.$.fileInput.value = '';
     this._setPlayIcon(false);
   }
@@ -754,6 +774,7 @@ class App {
       enabled: this.effectState[id].enabled
     }));
     await this.engine.setEffects(list);
+    this._updateSideStatus();
     this._updateChain();
   }
 
@@ -946,6 +967,33 @@ class App {
       if (fallback) fallback.style.display = 'none';
     } catch (e) {
       console.warn('[cover]', e);
+    }
+  }
+
+
+  _updateSideInfo(info, file) {
+    const set = (el, v) => { if (el) el.textContent = v; };
+    set(this.$.sideFileName, info?.name || '—');
+    const ext = (file?.name || info?.name || '').split('.').pop()?.toUpperCase() || '—';
+    set(this.$.sideFormat, ext);
+    set(this.$.sideSize, info?.size != null ? formatFileSize(info.size) : '—');
+    set(this.$.sideDuration, formatDuration(info?.duration || 0));
+    set(this.$.sideRate, info?.sampleRate ? `${(info.sampleRate / 1000).toFixed(1)} kHz` : '—');
+    set(this.$.sideChannels, info?.channels === 1 ? 'Mono' : (info?.channels === 2 ? 'Stereo' : (info?.channels || '—')));
+    this._updateSideStatus();
+    if (this.$.sidePanel) this.$.sidePanel.hidden = false;
+  }
+
+  _updateSideStatus() {
+    const enabled = Object.entries(this.effectState || {})
+      .filter(([, s]) => s.enabled)
+      .map(([id]) => effectsRegistry[id]?.meta?.name || id);
+    if (this.$.sideEffects) {
+      this.$.sideEffects.textContent = enabled.length ? enabled.join(' · ') : 'هیچ';
+    }
+    if (this.$.sideAutotune) {
+      const at = this.effectState?.autotune;
+      this.$.sideAutotune.textContent = at?.enabled ? 'فعال' : 'خاموش';
     }
   }
 

@@ -133,7 +133,14 @@ function nearestScaleMidi(midi, keyIndex, scaleIntervals) {
 /**
  * Detect most likely key & scale from pitch histogram.
  */
+/** Cache: avoid re-analyzing same buffer for key/scale */
+const _analysisCache = new WeakMap();
+
 export function detectKeyAndScale(audioBuffer) {
+  if (!audioBuffer) return { key: 'C', scale: 'major', confidence: 0 };
+  const cached = _analysisCache.get(audioBuffer);
+  if (cached) return { ...cached };
+
   const sr = audioBuffer.sampleRate;
   const length = audioBuffer.length;
   const channels = audioBuffer.numberOfChannels;
@@ -144,7 +151,8 @@ export function detectKeyAndScale(audioBuffer) {
   }
 
   const frameSize = 2048;
-  const hop = 1024;
+  // Adaptive hop: longer files use larger hop for faster analysis
+  const hop = audioBuffer.duration > 60 ? 2048 : (audioBuffer.duration > 20 ? 1536 : 1024);
   const hist = new Float32Array(12); // chroma
   let total = 0;
 
@@ -160,7 +168,9 @@ export function detectKeyAndScale(audioBuffer) {
   }
 
   if (total < 8) {
-    return { key: 'C', scale: 'major', confidence: 0 };
+    const r = { key: 'C', scale: 'major', confidence: 0 };
+    try { _analysisCache.set(audioBuffer, r); } catch (_) {}
+    return r;
   }
 
   // Score each key/scale
@@ -183,7 +193,9 @@ export function detectKeyAndScale(audioBuffer) {
   }
 
   const confidence = clamp(best.score / total, 0, 1);
-  return { key: best.key, scale: best.scale, confidence: Math.round(confidence * 100) };
+  const result = { key: best.key, scale: best.scale, confidence: Math.round(confidence * 100) };
+  try { _analysisCache.set(audioBuffer, result); } catch (_) {}
+  return result;
 }
 
 export function applyStylePreset(style) {
