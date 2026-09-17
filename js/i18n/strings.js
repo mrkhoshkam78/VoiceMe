@@ -28,6 +28,9 @@ export const STRINGS = {
     nav_effects: 'افکت‌ها',
     nav_export: 'خروجی گرفتن',
     nav_settings: 'تنظیمات',
+    nav_home: 'خانه',
+    nav_export: 'خروجی گرفتن',
+    nav_theme: 'تم سایت',
     file_info: 'اطلاعات فایل',
     name: 'نام',
     format: 'فرمت',
@@ -63,7 +66,10 @@ export const STRINGS = {
     theme_nebula: 'تم Nebula (تاریک)',
     theme_daylight: 'تم Daylight (روشن)',
     theme_toggle: 'جابه‌جایی تم',
-    nav_settings: 'تنظیمات'
+    nav_settings: 'تنظیمات',
+    nav_home: 'خانه',
+    nav_export: 'خروجی گرفتن',
+    nav_theme: 'تم سایت'
   },
   en: {
     brand_sub: 'Vocal Changer · Music Maker',
@@ -93,6 +99,9 @@ export const STRINGS = {
     nav_effects: 'Effects',
     nav_export: 'Export',
     nav_settings: 'Settings',
+    nav_home: 'Home',
+    nav_export: 'Export',
+    nav_theme: 'Theme',
     file_info: 'File Info',
     name: 'Name',
     format: 'Format',
@@ -128,7 +137,10 @@ export const STRINGS = {
     theme_nebula: 'Nebula theme (dark)',
     theme_daylight: 'Daylight theme (light)',
     theme_toggle: 'Toggle theme',
-    nav_settings: 'Settings'
+    nav_settings: 'Settings',
+    nav_home: 'Home',
+    nav_export: 'Export',
+    nav_theme: 'Theme'
   }
 };
 

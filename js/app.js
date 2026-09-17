@@ -53,6 +53,7 @@ class App {
     this._initLang();
     this._initStudioMenu();
     this._initStudioBg();
+    this._markActiveTheme();
     this._initEffectState();
     this._cacheDom();
     this._renderSidebar();
@@ -124,6 +125,10 @@ class App {
   }
 
   _enterEditor() {
+    // Keep header/menu above editor layers
+    document.body.classList.add('in-editor');
+    // Menu uses capture listeners; ensure drawer is still in DOM
+    if (!this._menuBound) this._initStudioMenu();
     if (this.$.landing) {
       this.$.landing.classList.add('hidden');
       this.$.landing.style.pointerEvents = 'none';
@@ -243,25 +248,31 @@ class App {
 
 
   _initStudioMenu() {
+    // Idempotent: safe to call again after entering editor
+    if (this._menuBound) return;
+    this._menuBound = true;
+
     const btn = document.getElementById('hamburgerBtn');
     const drawer = document.getElementById('navDrawer');
     const overlay = document.getElementById('navOverlay');
     const closeBtn = document.getElementById('navClose');
     if (!btn || !drawer) {
-      console.warn('[Menu] hamburger elements missing');
+      console.warn('[Menu] missing elements', { btn: !!btn, drawer: !!drawer });
+      this._menuBound = false;
       return;
     }
 
     const openMenu = () => {
-      drawer.hidden = false;
-      if (overlay) overlay.hidden = false;
-      // force reflow then animate
-      void drawer.offsetWidth;
-      drawer.classList.add('open');
-      overlay?.classList.add('open');
+      drawer.removeAttribute('hidden');
+      if (overlay) overlay.removeAttribute('hidden');
+      requestAnimationFrame(() => {
+        drawer.classList.add('open');
+        overlay?.classList.add('open');
+      });
       btn.setAttribute('aria-expanded', 'true');
       btn.classList.add('is-open');
       document.body.classList.add('menu-open');
+      this._markActiveTheme();
     };
 
     const closeMenu = () => {
@@ -270,64 +281,87 @@ class App {
       btn.setAttribute('aria-expanded', 'false');
       btn.classList.remove('is-open');
       document.body.classList.remove('menu-open');
-      const onEnd = () => {
-        drawer.hidden = true;
-        if (overlay) overlay.hidden = true;
-        drawer.removeEventListener('transitionend', onEnd);
+      const finish = () => {
+        drawer.setAttribute('hidden', '');
+        overlay?.setAttribute('hidden', '');
       };
-      drawer.addEventListener('transitionend', onEnd);
-      // fallback
-      setTimeout(() => {
-        if (!drawer.classList.contains('open')) {
-          drawer.hidden = true;
-          if (overlay) overlay.hidden = true;
-        }
-      }, 320);
+      setTimeout(finish, 300);
     };
 
+    this._openMenu = openMenu;
+    this._closeMenu = closeMenu;
+
+    // Use capture so nothing in editor can swallow the click
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (drawer.classList.contains('open')) closeMenu();
       else openMenu();
-    });
+    }, true);
+
     closeBtn?.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       closeMenu();
-    });
-    overlay?.addEventListener('click', () => closeMenu());
+    }, true);
+
+    overlay?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeMenu();
+    }, true);
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && drawer.classList.contains('open')) closeMenu();
     });
 
-    drawer.querySelectorAll('[data-action]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.preventDefault();
-        const action = el.getAttribute('data-action');
-        if (action === 'scroll') {
-          const t = document.getElementById(el.getAttribute('data-target'));
-          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else if (action === 'fx') {
-          const id = el.getAttribute('data-fx');
-          if (id && this.effectState?.[id] !== undefined) {
-            if (typeof this._selectEffect === 'function') this._selectEffect(id);
-            document.getElementById('effectsWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        } else if (action === 'export') {
-          const fmt = el.getAttribute('data-format');
-          const sel = document.getElementById('exportFormat');
-          if (sel && fmt) {
-            const opt = [...sel.options].find(o => o.value === fmt || String(o.value).includes(fmt));
-            if (opt) sel.value = opt.value;
-          }
-          if (typeof this._export === 'function') this._export();
-        } else if (action === 'theme' || action === 'theme-dark' || action === 'theme-light') {
-          if (action === 'theme-dark') this._setTheme('dark');
-          else if (action === 'theme-light') this._setTheme('light');
-          else if (typeof this._toggleTheme === 'function') this._toggleTheme();
-        }
+    // Event delegation on drawer body — works even if items re-rendered
+    drawer.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-action]');
+      if (!el || !drawer.contains(el)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const action = el.getAttribute('data-action');
+
+      if (action === 'home') {
         closeMenu();
-      });
+        // Show landing / scroll top
+        const landing = document.getElementById('landing');
+        const main = document.getElementById('mainApp');
+        if (landing) {
+          landing.classList.remove('hidden');
+          landing.style.display = '';
+          landing.removeAttribute('aria-hidden');
+        }
+        if (main) main.style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (action === 'export') {
+        closeMenu();
+        const main = document.getElementById('mainApp');
+        if (main && main.style.display === 'none') {
+          // need file first
+          this._toast?.('info', 'خروجی', 'ابتدا یک فایل بارگذاری کنید');
+        } else {
+          // ensure export controls visible / trigger export flow
+          document.getElementById('playerPanel')?.scrollIntoView({ behavior: 'smooth' });
+          // open format if available then export
+          setTimeout(() => {
+            if (typeof this._export === 'function') this._export();
+            else document.getElementById('btnExport')?.click();
+          }, 200);
+        }
+      } else if (action === 'theme-set') {
+        const th = el.getAttribute('data-theme');
+        if (th) this._setTheme(th);
+        this._markActiveTheme();
+        // keep menu open so user can compare themes
+      }
+    });
+  }
+
+  _markActiveTheme() {
+    const cur = document.documentElement.getAttribute('data-theme') || 'nebula';
+    document.querySelectorAll('.theme-opt').forEach(btn => {
+      btn.classList.toggle('active-theme', btn.getAttribute('data-theme') === cur);
     });
   }
 
@@ -388,24 +422,31 @@ class App {
   }
 
   _setTheme(theme) {
-    const next = theme === 'light' ? 'light' : 'dark';
+    const allowed = ['nebula', 'ember', 'arctic', 'vinyl', 'daylight', 'dark', 'light'];
+    let next = allowed.includes(theme) ? theme : 'nebula';
+    // map legacy
+    if (next === 'dark') next = 'nebula';
+    if (next === 'light') next = 'daylight';
     document.documentElement.setAttribute('data-theme', next);
+    document.documentElement.setAttribute('data-theme-name', next);
     localStorage.setItem('ae-theme', next);
-    document.documentElement.setAttribute('data-theme-name', next === 'dark' ? 'nebula' : 'daylight');
+    this._markActiveTheme?.();
   }
 
   _initTheme() {
-    // Nebula (dark) is the primary identity; Daylight (light) is optional
-    const saved = localStorage.getItem('ae-theme') || 'dark';
-    const theme = saved === 'light' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
-    document.documentElement.setAttribute('data-theme-name', theme === 'dark' ? 'nebula' : 'daylight');
+    let saved = localStorage.getItem('ae-theme') || 'nebula';
+    if (saved === 'dark') saved = 'nebula';
+    if (saved === 'light') saved = 'daylight';
+    this._setTheme(saved);
   }
 
   _toggleTheme() {
-    const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    this._setTheme(cur === 'dark' ? 'light' : 'dark');
+    const order = ['nebula', 'ember', 'arctic', 'vinyl'];
+    const cur = document.documentElement.getAttribute('data-theme') || 'nebula';
+    const i = order.indexOf(cur);
+    this._setTheme(order[(i + 1) % order.length]);
   }
+
 
   _initEffectState() {
     effectOrder.forEach(id => {
