@@ -50,7 +50,7 @@ export class AudioEngine {
   async loadFile(file) {
     this.stop();
     const { buffer, meta } = await this.loader.load(file);
-    this.originalBuffer = buffer;
+    this.originalBuffer = buffer; // immutable source – never mutate in place
     this.processedBuffer = null;
     this._lastVocalKey = null;
     this.meta = meta;

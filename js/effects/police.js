@@ -22,7 +22,7 @@ export function createNodes(ctx, params = {}) {
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -10;
   comp.knee.value = 2;
-  comp.ratio.value = 10;
+  comp.ratio.value = 2.50;
   comp.attack.value = 0.001;
   comp.release.value = 0.06;
 

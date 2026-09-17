@@ -19,7 +19,17 @@
       <h1>VoiceMe</h1>
       <span class="version-badge">V1.07.1</span>
     </div>
-    <div class="header-actions" id="headerActions">
+    
+    <nav class="main-nav" id="mainNav" aria-label="Main">
+      <a href="#landing" class="nav-link" data-nav="home" data-i18n="nav_home">خانه</a>
+      <a href="#mainApp" class="nav-link" data-nav="editor" data-i18n="nav_editor">ویرایشگر</a>
+      <a href="#effectsWorkspace" class="nav-link" data-nav="effects" data-i18n="nav_effects">افکت‌ها</a>
+      <button type="button" class="nav-link nav-btn" id="navExport" data-i18n="nav_export">خروجی</button>
+    </nav>
+    <button type="button" class="nav-burger" id="navBurger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+<div class="header-actions" id="headerActions">
       <div class="header-export" id="headerExport" hidden>
         <select id="exportFormat" class="hdr-select" aria-label="فرمت خروجی"></select>
         <select id="exportBitrate" class="hdr-select" aria-label="بیت‌ریت">
@@ -37,6 +47,10 @@
           Export
         </button>
       </div>
+      <select id="langSelect" class="hdr-select lang-select" aria-label="Language">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+      </select>
       <button type="button" class="theme-btn" id="themeBtn" aria-label="تغییر تم" title="تغییر تم">
         <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
@@ -55,9 +69,9 @@
           <svg viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
         </div>
         <h1 class="landing-title">VoiceMe</h1>
-        <p class="landing-sub">Professional Vocal Engine · AutoTune · Export</p>
+        <p class="landing-sub" data-i18n="landing_sub">Vocal Changer · Music Maker</p>
       </div>
-      <p class="landing-desc">تبدیل صدا، تصحیح Pitch و خروجی حرفه‌ای — همه در مرورگر</p>
+      <p class="landing-desc" data-i18n="landing_desc">تبدیل صدا، افکت حرفه‌ای و خروجی باکیفیت — همه در مرورگر</p>
       <div class="landing-cta">
         <label for="fileInput" class="btn btn-primary btn-lg" id="landingUploadBtn">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>

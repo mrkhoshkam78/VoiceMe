@@ -1,9 +1,10 @@
 /**
- * Audio Editor V1.07.1 – Application (UI layer only) — Professional Vocal Engine
+ * Audio Editor V2.0.0 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
 import { AudioEngine } from './audio-engine/AudioEngine.js';
+import { t, STRINGS } from './i18n/strings.js';
 import { AudioExporter } from './audio-engine/AudioExporter.js';
 import { effectsRegistry, effectOrder, effectCategories } from './effects/index.js';
 import { STYLE_PRESETS, detectKeyAndScale, applyStylePreset } from './effects/autotune.js';
@@ -49,6 +50,7 @@ class App {
     this._smoothedWave = null;
 
     this._initTheme();
+    this._initLang();
     this._initEffectState();
     this._cacheDom();
     this._renderSidebar();
@@ -183,8 +185,40 @@ class App {
     };
   }
 
+
+  _initLang() {
+    const saved = localStorage.getItem('ae-lang') || 'fa';
+    this.lang = saved === 'en' ? 'en' : 'fa';
+    document.documentElement.setAttribute('lang', this.lang);
+    document.documentElement.setAttribute('dir', this.lang === 'fa' ? 'rtl' : 'ltr');
+    const sel = document.getElementById('langSelect');
+    if (sel) sel.value = this.lang;
+    this._applyI18n();
+  }
+
+  _setLang(lang) {
+    this.lang = lang === 'en' ? 'en' : 'fa';
+    localStorage.setItem('ae-lang', this.lang);
+    document.documentElement.setAttribute('lang', this.lang);
+    document.documentElement.setAttribute('dir', this.lang === 'fa' ? 'rtl' : 'ltr');
+    this._applyI18n();
+  }
+
+  _applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      const val = t(key, this.lang);
+      if (val) el.textContent = val;
+    });
+    // Common dynamic labels
+    const st = document.getElementById('playerStatus');
+    if (st && !this.engine?.isPlaying) st.textContent = t('ready', this.lang);
+  }
+
+  _tt(key) { return t(key, this.lang || 'fa'); }
+
   _initTheme() {
-    const saved = localStorage.getItem('ae-theme') || 'light';
+    const saved = localStorage.getItem('ae-theme') || 'light'; // V2 default Light
     document.documentElement.setAttribute('data-theme', saved);
   }
 
@@ -272,6 +306,11 @@ class App {
     const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 
     on(this.$.themeBtn, 'click', () => this._toggleTheme());
+    on(document.getElementById('langSelect'), 'change', e => this._setLang(e.target.value));
+    on(document.getElementById('navExport'), 'click', () => this._export());
+    on(document.getElementById('navBurger'), 'click', () => {
+      document.getElementById('mainNav')?.classList.toggle('open-mobile');
+    });
     on(this.$.btnSideToggle, 'click', () => {
       const p = this.$.sidePanel;
       if (!p) return;

@@ -18,7 +18,7 @@ export function createNodes(ctx, params = {}) {
   const limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -2.5;
   limiter.knee.value = 1.5;
-  limiter.ratio.value = 14;
+  limiter.ratio.value = 8.0;
   limiter.attack.value = 0.001;
   limiter.release.value = 0.04;
 

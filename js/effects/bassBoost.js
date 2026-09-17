@@ -2,52 +2,61 @@ import { createGain, createBiquad } from './baseEffect.js';
 
 export const meta = {
   id: 'bassBoost',
-  name: 'تقویت بیس',
-  description: 'تقویت کنترل‌شده بم و گرمای صدا بدون clipping',
+  name: 'Bass Boost',
+  description: 'Controlled low-end warmth without mud or clipping',
   icon: 'bass',
-  category: 'enhancement',
-  defaultParams: { amount: 5, frequency: 110 }
+  category: 'tone',
+  defaultParams: { amount: 4, frequency: 100 }
 };
 
 export function createNodes(ctx, params = {}) {
-  const amount = Math.min(10, params.amount ?? 5);
-  const freq = params.frequency ?? 110;
+  const amount = Math.min(8, Math.max(0, params.amount ?? 4));
+  const freq = Math.min(250, Math.max(50, params.frequency ?? 100));
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
-  // Protect sub-rumble
-  const hp = createBiquad(ctx, 'highpass', 40, 0.7);
-  const shelf = createBiquad(ctx, 'lowshelf', freq, 1, amount);
-  const warm = createBiquad(ctx, 'peaking', 220, 1.0, amount > 6 ? amount * 0.25 : 0);
+  // Sub-cut to avoid boom/rumble
+  const hp = createBiquad(ctx, 'highpass', 35, 0.7);
+  // Focused low shelf, modest gain
+  const shelf = createBiquad(ctx, 'lowshelf', freq, 0.8, amount * 0.85);
+  // Light low-mid body, not muddy
+  const body = createBiquad(ctx, 'peaking', 180, 0.9, amount > 4 ? amount * 0.15 : 0);
+  // Slight high-mid clarity to compensate perception
+  const clear = createBiquad(ctx, 'peaking', 3200, 1.2, amount > 5 ? 0.8 : 0);
 
+  // Soft dynamics, low ratio – cascade-friendly
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -16;
-  comp.knee.value = 8;
-  comp.ratio.value = 2.2;
-  comp.attack.value = 0.01;
-  comp.release.value = 0.2;
+  comp.threshold.value = -18;
+  comp.knee.value = 10;
+  comp.ratio.value = 1.8;
+  comp.attack.value = 0.015;
+  comp.release.value = 0.22;
 
-  const makeUp = createGain(ctx, 1);
+  // Makeup compensation roughly inverse of boost energy
+  const makeup = createGain(ctx, Math.max(0.7, 1 - amount * 0.03));
 
   input.connect(hp);
   hp.connect(shelf);
-  shelf.connect(warm);
-  warm.connect(comp);
-  comp.connect(makeUp);
-  makeUp.connect(output);
+  shelf.connect(body);
+  body.connect(clear);
+  clear.connect(comp);
+  comp.connect(makeup);
+  makeup.connect(output);
 
   return {
     input, output,
-    nodes: [input, hp, shelf, warm, comp, makeUp, output],
+    nodes: [input, hp, shelf, body, clear, comp, makeup, output],
     update(p) {
       if (p.amount !== undefined) {
-        const a = Math.min(10, p.amount);
-        shelf.gain.setTargetAtTime(a, ctx.currentTime, 0.04);
-        warm.gain.setTargetAtTime(a > 6 ? a * 0.25 : 0, ctx.currentTime, 0.04);
+        const a = Math.min(8, Math.max(0, p.amount));
+        shelf.gain.setTargetAtTime(a * 0.85, ctx.currentTime, 0.05);
+        body.gain.setTargetAtTime(a > 4 ? a * 0.15 : 0, ctx.currentTime, 0.05);
+        clear.gain.setTargetAtTime(a > 5 ? 0.8 : 0, ctx.currentTime, 0.05);
+        makeup.gain.setTargetAtTime(Math.max(0.7, 1 - a * 0.03), ctx.currentTime, 0.05);
       }
       if (p.frequency !== undefined) {
-        shelf.frequency.setTargetAtTime(p.frequency, ctx.currentTime, 0.04);
+        shelf.frequency.setTargetAtTime(Math.min(250, Math.max(50, p.frequency)), ctx.currentTime, 0.05);
       }
     }
   };

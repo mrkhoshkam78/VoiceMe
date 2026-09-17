@@ -7,7 +7,7 @@ import { VOCAL_PRESETS } from '../audio-engine/PitchProcessor.js';
 export const meta = {
   id: 'femaleVoice',
   name: 'صدای زنانه',
-  description: 'جنس و رنگ صدا را زنانه‌تر می‌کند؛ سرعت و مدت ثابت می‌ماند',
+  description: 'Natural female character via pitch + formant + timbre — speed unchanged',
   icon: 'female',
   category: 'voice',
   defaultParams: { mode: 'female', intensity: 0.8 },
@@ -60,7 +60,7 @@ export function createNodes(ctx, params = {}) {
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -20;
   comp.knee.value = 10;
-  comp.ratio.value = 2.2;
+  comp.ratio.value = 1.8;
   comp.attack.value = 0.012;
   comp.release.value = 0.18;
 
