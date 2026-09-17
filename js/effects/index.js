@@ -1,5 +1,5 @@
 /**
- * Effects registry V1.03
+ * Effects registry V1.05 – categorized
  */
 import * as femaleVoice from './femaleVoice.js';
 import * as deepVoice from './deepVoice.js';
@@ -25,17 +25,47 @@ modules.forEach(mod => {
     meta: mod.meta,
     createNodes: mod.createNodes,
     processOfflineBuffer: mod.processOfflineBuffer || null,
-    // Autotune extras
+    getPitchConfig: mod.getPitchConfig || null,
     STYLE_PRESETS: mod.STYLE_PRESETS || null,
     detectKeyAndScale: mod.detectKeyAndScale || null,
     applyStylePreset: mod.applyStylePreset || null
   };
 });
 
+/** Ordered list for UI + processing priority */
 export const effectOrder = [
   'femaleVoice', 'deepVoice', 'autotune',
   'speaker', 'police', 'echo', 'studio',
   'bassBoost', 'improveQuality', 'noiseReduction', 'volume'
+];
+
+/** Categories for redesigned Effects List */
+export const effectCategories = [
+  {
+    id: 'voice',
+    label: 'صدا (Vocal)',
+    ids: ['femaleVoice', 'deepVoice']
+  },
+  {
+    id: 'correction',
+    label: 'تصحیح (Correction)',
+    ids: ['autotune', 'noiseReduction']
+  },
+  {
+    id: 'tone',
+    label: 'تن (Tone)',
+    ids: ['bassBoost', 'improveQuality', 'volume']
+  },
+  {
+    id: 'space',
+    label: 'فضا (Space)',
+    ids: ['echo', 'studio']
+  },
+  {
+    id: 'character',
+    label: 'کاراکتر (Character)',
+    ids: ['speaker', 'police']
+  }
 ];
 
 export function createEffectNodes(ctx, id, params) {

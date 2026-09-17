@@ -1,78 +1,84 @@
 /**
  * Offline rendering of the full effect chain.
- * AutoTune (if present) is pre-processed on the buffer first.
+ * Order:
+ * 1. Vocal pitch (female/deep) – duration-preserving
+ * 2. AutoTune offline pitch correction
+ * 3. Noise Reduction offline
+ * 4. Remaining live-style effects via OfflineAudioContext (rate = 1)
  */
 import { createEffectNodes, effectsRegistry } from '../effects/index.js';
-import { clamp } from '../utils/helpers.js';
 
 export class AudioRenderer {
   constructor(ctxManager) {
     this.ctxManager = ctxManager;
   }
 
-  /**
-   * @param {AudioBuffer} originalBuffer
-   * @param {Array} effects  [{id, params, enabled}]
-   * @param {function} onProgress  (0..1, stageLabel)
-   * @returns {Promise<AudioBuffer>}
-   */
   async render(originalBuffer, effects, onProgress) {
     await this.ctxManager.ensure();
     let working = originalBuffer;
     const enabled = effects.filter(e => e.enabled);
 
-    // 1) AutoTune offline pitch correction
+    // 1) Vocal gender pitch (duration preserved)
+    const vocalIds = ['femaleVoice', 'deepVoice'];
+    for (const vid of vocalIds) {
+      const fx = enabled.find(e => e.id === vid);
+      if (!fx) continue;
+      const entry = effectsRegistry[vid];
+      if (entry?.processOfflineBuffer) {
+        if (onProgress) onProgress(0.05, 'در حال تغییر Pitch / Formant...');
+        working = await entry.processOfflineBuffer(working, fx.params, (p) => {
+          if (onProgress) onProgress(0.05 + p * 0.25, 'در حال تغییر Pitch / Formant...');
+        });
+      }
+    }
+
+    // 2) AutoTune offline
     const at = enabled.find(e => e.id === 'autotune');
     if (at) {
       const entry = effectsRegistry.autotune;
       if (entry?.processOfflineBuffer) {
-        if (onProgress) onProgress(0.02, 'در حال تشخیص Pitch...');
+        if (onProgress) onProgress(0.32, 'در حال تشخیص و اصلاح Pitch...');
         working = await entry.processOfflineBuffer(working, at.params, (p) => {
-          if (onProgress) onProgress(0.02 + p * 0.35, 'در حال اعمال اتوتیون...');
+          if (onProgress) onProgress(0.32 + p * 0.25, 'در حال اعمال اتوتیون...');
         });
       }
     }
 
-    // 2) Noise reduction offline if available
+    // 3) Noise reduction offline
     const nr = enabled.find(e => e.id === 'noiseReduction');
     if (nr) {
       const entry = effectsRegistry.noiseReduction;
       if (entry?.processOfflineBuffer) {
-        if (onProgress) onProgress(0.38, 'در حال کاهش نویز...');
+        if (onProgress) onProgress(0.58, 'در حال کاهش نویز...');
         working = await entry.processOfflineBuffer(working, nr.params, (p) => {
-          if (onProgress) onProgress(0.38 + p * 0.15, 'در حال کاهش نویز...');
+          if (onProgress) onProgress(0.58 + p * 0.12, 'در حال کاهش نویز...');
         });
       }
     }
 
-    const chain = enabled.filter(e => e.id !== 'autotune' && e.id !== 'noiseReduction');
+    // Remaining effects that are pure Web Audio nodes (no buffer pre-process)
+    const skip = new Set(['autotune', 'noiseReduction', 'femaleVoice', 'deepVoice']);
+    const chain = enabled.filter(e => !skip.has(e.id));
+
     const duration = working.duration;
     const sampleRate = working.sampleRate;
     const channels = working.numberOfChannels;
-
-    let pitchFactor = 1;
-    for (const e of chain) {
-      try {
-        const r = createEffectNodes(this.ctxManager.get(), e.id, e.params);
-        if (r.pitchFactor) pitchFactor *= r.pitchFactor;
-        (r.nodes || []).forEach(n => { try { n.disconnect(); } catch (_) {} });
-      } catch (_) {}
-    }
-    pitchFactor = clamp(pitchFactor, 0.5, 2.0);
-
-    const renderedDuration = duration / pitchFactor;
-    const frames = Math.max(1, Math.ceil(sampleRate * renderedDuration));
+    const frames = Math.max(1, Math.ceil(sampleRate * duration));
     const offline = new OfflineAudioContext(channels, frames, sampleRate);
 
     const source = offline.createBufferSource();
     source.buffer = working;
-    source.playbackRate.value = pitchFactor;
+    source.playbackRate.value = 1; // always 1 – duration already preserved
 
     let current = source;
     for (const effect of chain) {
-      const result = createEffectNodes(offline, effect.id, effect.params);
-      current.connect(result.input);
-      current = result.output;
+      try {
+        const result = createEffectNodes(offline, effect.id, effect.params);
+        current.connect(result.input);
+        current = result.output;
+      } catch (err) {
+        console.error('[Renderer] effect failed', effect.id, err);
+      }
     }
 
     const master = offline.createGain();
@@ -81,15 +87,15 @@ export class AudioRenderer {
     master.connect(offline.destination);
     source.start(0);
 
-    if (onProgress) onProgress(0.55, 'در حال رندر نهایی...');
+    if (onProgress) onProgress(0.72, 'در حال رندر نهایی...');
 
     let timer;
     if (onProgress) {
-      let p = 0.55;
+      let p = 0.72;
       timer = setInterval(() => {
-        p = Math.min(0.95, p + 0.025);
+        p = Math.min(0.95, p + 0.02);
         onProgress(p, 'در حال رندر نهایی...');
-      }, 90);
+      }, 80);
     }
 
     try {

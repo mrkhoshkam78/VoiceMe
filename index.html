@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="ویرایشگر صوتی حرفه‌ای – Audio Editor V1.04-FULL">
-  <title>ویرایشگر صوتی | Audio Editor V1.04-FULL</title>
+  <meta name="description" content="VoiceMe – Professional Vocal Engine, AutoTune, Export & Immersive UI">
+  <title>VoiceMe V1.05 — Professional Vocal Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,8 +16,8 @@
       <div class="logo-mark">
         <svg viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
       </div>
-      <h1>ویرایشگر صوتی</h1>
-      <span class="version-badge">V1.04-FULL</span>
+      <h1>VoiceMe</h1>
+      <span class="version-badge">V1.05</span>
     </div>
     <div class="header-actions">
       <button type="button" class="theme-btn" id="themeBtn" aria-label="تغییر تم" title="تغییر تم">
@@ -26,7 +26,32 @@
     </div>
   </header>
 
-  <main class="main">
+  
+  <!-- Immersive Landing -->
+  <section class="landing" id="landing">
+    <div class="landing-bg">
+      <canvas id="landingViz"></canvas>
+    </div>
+    <div class="landing-content">
+      <div class="landing-logo">
+        <div class="logo-mark large">
+          <svg viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
+        </div>
+        <h1 class="landing-title">VoiceMe</h1>
+        <p class="landing-sub">Professional Vocal Engine · AutoTune · Export</p>
+      </div>
+      <p class="landing-desc">تبدیل صدا، تصحیح Pitch و خروجی حرفه‌ای — همه در مرورگر</p>
+      <div class="landing-cta">
+        <label for="fileInput" class="btn btn-primary btn-lg" id="landingUploadBtn">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          آپلود فایل صوتی
+        </label>
+        <p class="landing-hint">MP3 · WAV · FLAC · OGG · M4A</p>
+      </div>
+    </div>
+  </section>
+
+  <main class="main" id="mainApp" style="display:none">
     <!-- Upload -->
     <section class="upload-zone" id="uploadZone">
       <div class="upload-empty">

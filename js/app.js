@@ -1,11 +1,11 @@
 /**
- * Audio Editor V1.04-FULL – Application (UI layer only) — FULL – Real MP3+FLAC + Live Updates
+ * Audio Editor V1.05 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
 import { AudioEngine } from './audio-engine/AudioEngine.js';
 import { AudioExporter } from './audio-engine/AudioExporter.js';
-import { effectsRegistry, effectOrder } from './effects/index.js';
+import { effectsRegistry, effectOrder, effectCategories } from './effects/index.js';
 import { STYLE_PRESETS, detectKeyAndScale, applyStylePreset } from './effects/autotune.js';
 import {
   formatDuration, formatFileSize, isSupportedFormat,
@@ -28,7 +28,15 @@ const ICONS = {
   volume: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>'
 };
 
-const CATEGORIES = { voice: 'صدا', environment: 'محیط', enhancement: 'بهبود' };
+const CATEGORIES = {
+  voice: 'صدا (Vocal)',
+  correction: 'تصحیح',
+  tone: 'تن',
+  space: 'فضا',
+  character: 'کاراکتر',
+  environment: 'فضا',
+  enhancement: 'تن'
+};
 
 class App {
   constructor() {
@@ -47,7 +55,69 @@ class App {
     this._bindEvents();
     this._wireEngine();
     this._populateExportFormats();
+    this._initLanding();
   }
+
+  _initLanding() {
+    this.$.landing = document.getElementById('landing');
+    this.$.mainApp = document.getElementById('mainApp') || document.querySelector('main.main');
+    this.$.landingViz = document.getElementById('landingViz');
+    if (this.$.landingViz) this._startLandingViz();
+  }
+
+  _startLandingViz() {
+    const canvas = this.$.landingViz;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let w, h, t = 0;
+    const resize = () => {
+      w = canvas.width = window.innerWidth * devicePixelRatio;
+      h = canvas.height = window.innerHeight * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    const waves = [
+      { amp: 28, freq: 0.008, speed: 0.012, phase: 0 },
+      { amp: 18, freq: 0.014, speed: 0.018, phase: 1.2 },
+      { amp: 12, freq: 0.022, speed: 0.025, phase: 2.5 }
+    ];
+    const draw = () => {
+      if (!this.$.landing || this.$.landing.classList.contains('hidden')) return;
+      const cssW = window.innerWidth, cssH = window.innerHeight;
+      ctx.clearRect(0, 0, cssW, cssH);
+      const mid = cssH * 0.55;
+      waves.forEach((wv, wi) => {
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(${90 + wi * 40}, ${140 + wi * 20}, 250, ${0.18 - wi * 0.04})`;
+        ctx.lineWidth = 2 - wi * 0.4;
+        for (let x = 0; x <= cssW; x += 3) {
+          const y = mid + Math.sin(x * wv.freq + t * wv.speed + wv.phase) * wv.amp
+            + Math.sin(x * wv.freq * 0.4 + t * 0.008) * (wv.amp * 0.35);
+          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      });
+      t += 1;
+      this._landingRaf = requestAnimationFrame(draw);
+    };
+    draw();
+  }
+
+  _enterEditor() {
+    if (this.$.landing) {
+      this.$.landing.classList.add('hidden');
+      setTimeout(() => {
+        if (this.$.landing) this.$.landing.style.display = 'none';
+      }, 650);
+    }
+    if (this.$.mainApp) {
+      this.$.mainApp.style.display = '';
+      this.$.mainApp.classList.add('entering');
+    }
+    if (this._landingRaf) cancelAnimationFrame(this._landingRaf);
+  }
+
 
   _cacheDom() {
     const id = (s) => document.getElementById(s);
@@ -96,32 +166,49 @@ class App {
   _renderSidebar() {
     const sidebar = this.$.effectsSidebar;
     sidebar.innerHTML = '<div class="sidebar-title">افکت‌ها</div>';
-    let lastCat = null;
-    effectOrder.forEach(id => {
-      const meta = effectsRegistry[id].meta;
-      if (meta.category !== lastCat) {
-        lastCat = meta.category;
+    const cats = (typeof effectCategories !== 'undefined') ? effectCategories : null;
+    if (cats) {
+      cats.forEach(cat => {
         const lab = document.createElement('div');
         lab.className = 'effect-cat-label';
-        lab.textContent = CATEGORIES[meta.category] || meta.category;
+        lab.textContent = cat.label;
         sidebar.appendChild(lab);
-      }
-      const item = document.createElement('div');
-      item.className = 'effect-item';
-      item.dataset.id = id;
-      item.tabIndex = 0;
-      item.innerHTML = `
-        <div class="fx-icon">${ICONS[meta.icon] || ICONS.quality}</div>
-        <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
-        <label class="fx-toggle" data-toggle-wrap="${id}">
-          <input type="checkbox" data-toggle="${id}" aria-label="فعال‌سازی ${meta.name}">
-          <span class="fx-toggle-track"></span>
-        </label>`;
-      sidebar.appendChild(item);
-    });
+        cat.ids.forEach(id => {
+          const meta = effectsRegistry[id]?.meta;
+          if (!meta) return;
+          const item = document.createElement('div');
+          item.className = 'effect-item' + (this.effectState[id]?.enabled ? ' active-fx' : '');
+          item.dataset.id = id;
+          item.tabIndex = 0;
+          item.innerHTML = `
+            <div class="fx-icon">${ICONS[meta.icon] || ICONS.quality}</div>
+            <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
+            <label class="fx-toggle" data-toggle-wrap="${id}">
+              <input type="checkbox" data-toggle="${id}" ${this.effectState[id]?.enabled ? 'checked' : ''} aria-label="فعال‌سازی ${meta.name}">
+              <span class="fx-toggle-track"></span>
+            </label>`;
+          sidebar.appendChild(item);
+        });
+      });
+    } else {
+      effectOrder.forEach(id => {
+        const meta = effectsRegistry[id].meta;
+        const item = document.createElement('div');
+        item.className = 'effect-item';
+        item.dataset.id = id;
+        item.innerHTML = `
+          <div class="fx-icon">${ICONS[meta.icon] || ''}</div>
+          <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
+          <label class="fx-toggle" data-toggle-wrap="${id}">
+            <input type="checkbox" data-toggle="${id}">
+            <span class="fx-toggle-track"></span>
+          </label>`;
+        sidebar.appendChild(item);
+      });
+    }
   }
 
-  _populateExportFormats() {
+  _populateExportFormats_populateExportFormats() {
     // Inject export settings into action bar if not present
     const bar = this.$.actionBar?.querySelector('.action-bar-inner');
     if (!bar || document.getElementById('exportFormat')) return;
@@ -336,6 +423,7 @@ class App {
       this.$.fileFormat.textContent =
         `${(file.name.split('.').pop() || '').toUpperCase()} · ${info.sampleRate} Hz · ${info.channels}ch`;
 
+      this._enterEditor();
       this.$.playerPanel.classList.add('visible');
       this.$.effectsWorkspace.classList.add('visible');
       this.$.chainBar.classList.add('visible');
@@ -391,16 +479,14 @@ class App {
     this.$.modeProcessed.classList.toggle('active', mode === 'processed');
   }
 
-  _toggleEffect(id, enabled) {
+  async _toggleEffect(id, enabled) {
     this.effectState[id].enabled = !!enabled;
     const item = this.$.effectsSidebar.querySelector(`[data-id="${id}"]`);
     if (item) item.classList.toggle('active-fx', !!enabled);
-    // Keep checkbox in sync if toggled programmatically
     const cb = this.$.effectsSidebar.querySelector(`input[data-toggle="${id}"]`);
     if (cb && cb.checked !== !!enabled) cb.checked = !!enabled;
 
-    this._syncEffects();
-    this._updateChain();
+    await this._syncEffects();
 
     if (typeof console !== 'undefined') {
       console.debug('[Effect]', id, enabled ? 'ON' : 'OFF',
@@ -433,7 +519,7 @@ class App {
 
     if (id === 'femaleVoice') {
       body += this._chips(id, 'mode', 'حالت', [
-        { v: 'girl', l: 'دخترانه' }, { v: 'woman', l: 'زنانه' }
+        { v: 'girl', l: 'Girl' }, { v: 'female', l: 'Female' }, { v: 'woman', l: 'Woman' }
       ], p.mode);
       body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.75) * 100, 0.01);
     } else if (id === 'deepVoice') {
@@ -559,13 +645,13 @@ class App {
     this.$.controlsContent.innerHTML = '';
   }
 
-  _syncEffects() {
+  async _syncEffects() {
     const list = effectOrder.map(id => ({
       id,
       params: { ...this.effectState[id].params },
       enabled: this.effectState[id].enabled
     }));
-    this.engine.setEffects(list);
+    await this.engine.setEffects(list);
     this._updateChain();
   }
 

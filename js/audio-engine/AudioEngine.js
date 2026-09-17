@@ -1,6 +1,7 @@
 /**
- * AudioEngine – public facade for the entire audio subsystem.
+ * AudioEngine – public facade V1.05
  * UI talks only to this class.
+ * Vocal pitch effects use duration-preserving PitchProcessor.
  */
 import { AudioContextManager } from './AudioContextManager.js';
 import { AudioLoader } from './AudioLoader.js';
@@ -8,6 +9,7 @@ import { AudioGraph } from './AudioGraph.js';
 import { AudioPlayer } from './AudioPlayer.js';
 import { AudioRenderer } from './AudioRenderer.js';
 import { AudioExporter } from './AudioExporter.js';
+import { effectsRegistry } from '../effects/index.js';
 
 export class AudioEngine {
   constructor() {
@@ -19,26 +21,26 @@ export class AudioEngine {
     this.exporter = new AudioExporter();
 
     this.originalBuffer = null;
+    this.processedBuffer = null; // after vocal pitch (duration-preserved)
     this.meta = null;
-    this.effects = []; // [{id, params, enabled}]
+    this.effects = [];
     this.previewMode = 'processed';
+    this._vocalProcessing = false;
 
-    // proxy events
     this.player.onTimeUpdate = (t) => { if (this.onTimeUpdate) this.onTimeUpdate(t); };
     this.player.onEnded = () => { if (this.onEnded) this.onEnded(); };
     this.player.onStateChange = (s) => { if (this.onStateChange) this.onStateChange(s); };
   }
 
-  // ── Events (set by UI) ──
   onTimeUpdate = null;
   onEnded = null;
   onStateChange = null;
 
-  // ── Load ──
   async loadFile(file) {
     this.stop();
     const { buffer, meta } = await this.loader.load(file);
     this.originalBuffer = buffer;
+    this.processedBuffer = null;
     this.meta = meta;
     this.player.setBuffer(buffer);
     this.effects = [];
@@ -46,53 +48,114 @@ export class AudioEngine {
     return meta;
   }
 
-  // ── Effects ──
-  setEffects(list) {
+  /**
+   * Apply duration-preserving vocal pitch if female/deep enabled.
+   * Returns the buffer that should be played (original or pitched).
+   */
+  async _ensureProcessedBuffer() {
+    const vocal = this.effects.find(e =>
+      e.enabled && (e.id === 'femaleVoice' || e.id === 'deepVoice')
+    );
+
+    if (!vocal || this.previewMode === 'original') {
+      this.processedBuffer = null;
+      return this.originalBuffer;
+    }
+
+    // Cache key
+    const key = JSON.stringify({ id: vocal.id, params: vocal.params });
+    if (this._lastVocalKey === key && this.processedBuffer) {
+      return this.processedBuffer;
+    }
+
+    this._vocalProcessing = true;
+    try {
+      const entry = effectsRegistry[vocal.id];
+      if (entry?.processOfflineBuffer) {
+        this.processedBuffer = await entry.processOfflineBuffer(
+          this.originalBuffer,
+          vocal.params
+        );
+        this._lastVocalKey = key;
+      } else {
+        this.processedBuffer = this.originalBuffer;
+      }
+    } finally {
+      this._vocalProcessing = false;
+    }
+    return this.processedBuffer || this.originalBuffer;
+  }
+
+  async setEffects(list) {
     this.effects = list.map(e => ({
       id: e.id,
       params: { ...e.params },
       enabled: !!e.enabled
     }));
     this.player.setEffects(this.effects);
+
+    // Re-process vocal buffer if needed
+    const hasVocal = this.effects.some(e =>
+      e.enabled && (e.id === 'femaleVoice' || e.id === 'deepVoice')
+    );
+    if (hasVocal) {
+      this._lastVocalKey = null; // force reprocess
+      const buf = await this._ensureProcessedBuffer();
+      this.player.setBuffer(buf);
+    } else {
+      this.processedBuffer = null;
+      this._lastVocalKey = null;
+      this.player.setBuffer(this.originalBuffer);
+    }
+
     if (this.player.isPlaying) {
-      this.player.rebuild();
+      await this.player.rebuild();
     }
   }
 
-  updateEffectParams(id, params) {
+  async updateEffectParams(id, params) {
     const e = this.effects.find(x => x.id === id);
     if (!e) return;
-    const prev = { ...e.params };
     Object.assign(e.params, params);
     this.player.setEffects(this.effects);
 
-    // Pitch-based effects need rebuild when intensity/mode changes
-    const needsRebuild = (id === 'femaleVoice' || id === 'deepVoice') &&
-      (params.intensity !== undefined || params.mode !== undefined);
+    const isVocal = id === 'femaleVoice' || id === 'deepVoice';
+    const intensityOrMode = params.intensity !== undefined || params.mode !== undefined;
 
-    // 1) Prefer live AudioParam update (no audible gap)
+    if (isVocal && intensityOrMode && e.enabled) {
+      this._lastVocalKey = null;
+      const buf = await this._ensureProcessedBuffer();
+      this.player.setBuffer(buf);
+      if (this.player.isPlaying) await this.player.rebuild();
+      return;
+    }
+
+    // Live AudioParam update
     const live = this.graph.updateParams(id, params);
-    if (live && !needsRebuild) return;
+    if (live) return;
 
-    // 2) Effect needs structural rebuild (e.g. pitchFactor) while playing
     if (this.player.isPlaying) {
-      this.player.rebuild();
+      await this.player.rebuild();
     }
   }
 
-  // ── Playback ──
   async play(offset) {
-    // Ensure context is running (Chrome autoplay)
     await this.ctxManager.ensure();
     this.player.setMode(this.previewMode);
+
+    if (this.previewMode === 'processed') {
+      const buf = await this._ensureProcessedBuffer();
+      this.player.setBuffer(buf);
+    } else {
+      this.player.setBuffer(this.originalBuffer);
+    }
+
     this.player.setEffects(this.effects);
     await this.player.play(offset);
   }
 
   pause() { this.player.pause(); }
-
   stop(reset = true) { this.player.stop(reset); }
-
   seek(t) { this.player.seek(t); }
 
   setPreviewMode(mode) {
@@ -103,12 +166,14 @@ export class AudioEngine {
 
   get isPlaying() { return this.player.isPlaying; }
   get currentTime() { return this.player.currentTime; }
-  get duration() { return this.player.duration; }
+  get duration() {
+    // Always report original duration (pitch preserves it)
+    return this.originalBuffer ? this.originalBuffer.duration : 0;
+  }
 
   getAnalyserTimeData() { return this.graph.getAnalyserTimeData(); }
   getAnalyserFreqData() { return this.graph.getAnalyserFreqData(); }
 
-  // ── Export ──
   async export(options, onProgress) {
     if (!this.originalBuffer) throw new Error('NO_BUFFER');
     const rendered = await this.renderer.render(
@@ -123,7 +188,10 @@ export class AudioEngine {
   reset() {
     this.stop(true);
     this.effects = [];
+    this.processedBuffer = null;
+    this._lastVocalKey = null;
     this.player.setEffects([]);
+    this.player.setBuffer(this.originalBuffer);
     this.previewMode = 'processed';
     this.player.setMode('processed');
   }
@@ -133,10 +201,10 @@ export class AudioEngine {
     this.graph.disconnect();
     await this.ctxManager.close();
     this.originalBuffer = null;
+    this.processedBuffer = null;
     this.meta = null;
   }
 
-  /** Diagnostics for development */
   getDiagnostics() {
     const chain = this.graph.chain || [];
     return {
@@ -154,6 +222,7 @@ export class AudioEngine {
       playbackRate: this.graph.playbackRate || 1,
       previewMode: this.previewMode,
       bufferSampleRate: this.originalBuffer?.sampleRate ?? 0,
+      vocalProcessed: !!this.processedBuffer,
       signalPath: this._describeSignalPath()
     };
   }

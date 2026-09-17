@@ -940,3 +940,136 @@ input[type="range"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ── V1.05 Immersive Landing ── */
+.landing {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #0b0f17);
+  overflow: hidden;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.landing.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.04);
+}
+.landing-bg {
+  position: absolute;
+  inset: 0;
+}
+.landing-bg canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0.55;
+}
+.landing-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 2rem;
+  max-width: 520px;
+}
+.landing-logo .logo-mark.large {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.25rem;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 40px rgba(59, 130, 246, 0.35);
+}
+.landing-logo .logo-mark.large svg {
+  width: 32px;
+  height: 32px;
+  fill: #fff;
+}
+.landing-title {
+  font-size: clamp(2.4rem, 6vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.35rem;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.landing-sub {
+  font-size: 0.95rem;
+  color: var(--text-muted, #94a3b8);
+  margin: 0 0 1.5rem;
+  font-weight: 500;
+}
+.landing-desc {
+  color: var(--text-secondary, #cbd5e1);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  margin: 0 0 2rem;
+}
+.landing-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+.btn-lg {
+  padding: 0.9rem 1.75rem;
+  font-size: 1.05rem;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.landing-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+/* Effects category labels */
+.effect-cat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #64748b);
+  padding: 0.85rem 0.75rem 0.35rem;
+  margin-top: 0.25rem;
+}
+
+/* Active effect visual */
+.effect-item.active-fx {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+/* Smooth editor entrance */
+.main.entering {
+  animation: editorIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes editorIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Header logo text */
+.header .logo h1 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.version-badge {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  font-weight: 600;
+}
