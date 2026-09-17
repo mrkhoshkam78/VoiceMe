@@ -1,21 +1,11 @@
-# VoiceMe V1.06
+# VoiceMe V1.07 — Responsive, Theme & Audio Quality
 
-Professional Vocal Engine — Dual Track · Speed · Seamless Effects
-
-## Fixes
-- Effect apply no longer freezes UI for long periods (async pitch + yield)
-- Playback does not unnecessarily pause on live effect param changes
-- Vocal processing only restarts audio once after processing completes
-
-## Features
-- Dual Track (A + B): independent Gain / Mute / Solo, synchronized play
-- Track B parallel mix (effects primarily on Track A in this build)
-- Speed control 0.5x–2.0x
-- Export settings in header
-- Procedural cover art
-- Animated play button
-- Duration-preserving Girl / Female / Woman / Male
-- Real MP3 (LAME) + FLAC + WAV
+## What changed
+- **Responsive**: mobile breakpoints 360/480/720/860 — dual tracks stack, effects single column, header export wraps, safe-area for action bar
+- **Theme**: expanded design tokens (`--waveform`, `--bg-secondary`, `--surface-elevated`, …); visualizer reads CSS variables; fewer hard-coded colors
+- **Audio quality**: softer Girl/Female/Woman/Male pitch ratios; Bass with high-pass protection + milder boost; Echo with wet HPF + capped feedback
+- **Preview**: status chip (Ready/Playing), theme-aware waveform colors
+- **Descriptions**: clearer Persian copy for effects
 
 ## Run
 ```bash

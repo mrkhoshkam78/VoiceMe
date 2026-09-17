@@ -3,7 +3,7 @@ import { createGain } from './baseEffect.js';
 export const meta = {
   id: 'volume',
   name: 'بلندی صدا',
-  description: 'افزایش یا کاهش Volume با Limiter',
+  description: 'بلندی خروجی با محافظت در برابر clipping',
   icon: 'volume',
   category: 'enhancement',
   defaultParams: { gain: 1.0 }

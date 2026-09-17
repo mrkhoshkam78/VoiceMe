@@ -3,7 +3,7 @@ import { createGain, createBiquad } from './baseEffect.js';
 export const meta = {
   id: 'improveQuality',
   name: 'بهبود کیفیت',
-  description: 'EQ اصلاحی، Compression ملایم و افزایش وضوح',
+  description: 'شفافیت و تعادل فرکانسی ملایم برای وضوح بیشتر',
   icon: 'quality',
   category: 'enhancement',
   defaultParams: { intensity: 0.6 }

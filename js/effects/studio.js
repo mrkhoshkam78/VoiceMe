@@ -3,7 +3,7 @@ import { createGain, createBiquad } from './baseEffect.js';
 export const meta = {
   id: 'studio',
   name: 'استودیو',
-  description: 'ریورب طبیعی + EQ و Compression استودیویی',
+  description: 'حس فضای استودیو با بازتاب ملایم و وضوح کنترل‌شده',
   icon: 'studio',
   category: 'environment',
   defaultParams: { roomSize: 0.5, wet: 0.32, intensity: 0.65 }

@@ -8,7 +8,7 @@ import { VOCAL_PRESETS } from '../audio-engine/PitchProcessor.js';
 export const meta = {
   id: 'femaleVoice',
   name: 'صدای زنانه',
-  description: 'تغییر Pitch و Formant مستقل از سرعت – Girl / Female / Woman',
+  description: 'جنس صدا را طبیعی‌تر و روشن‌تر می‌کند؛ سرعت پخش ثابت می‌ماند',
   icon: 'female',
   category: 'voice',
   defaultParams: { mode: 'female', intensity: 0.75 },

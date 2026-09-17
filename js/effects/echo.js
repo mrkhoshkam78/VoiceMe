@@ -3,16 +3,16 @@ import { createGain } from './baseEffect.js';
 export const meta = {
   id: 'echo',
   name: 'اکو',
-  description: 'تأخیر و پژواک با کنترل Delay و Feedback',
+  description: 'تکرار کنترل‌شده صدا با Delay، Feedback و Mix',
   icon: 'echo',
   category: 'environment',
-  defaultParams: { delay: 0.28, feedback: 0.4, mix: 0.45 }
+  defaultParams: { delay: 0.28, feedback: 0.35, mix: 0.4 }
 };
 
 export function createNodes(ctx, params = {}) {
   const delayTime = params.delay ?? 0.28;
-  const feedback = Math.min(0.85, params.feedback ?? 0.4);
-  const mix = params.mix ?? 0.45;
+  const feedback = Math.min(0.75, params.feedback ?? 0.35);
+  const mix = params.mix ?? 0.4;
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
@@ -25,13 +25,20 @@ export function createNodes(ctx, params = {}) {
   const fbGain = createGain(ctx, feedback);
   const fbFilter = ctx.createBiquadFilter();
   fbFilter.type = 'lowpass';
-  fbFilter.frequency.value = 3200;
+  fbFilter.frequency.value = 3800;
+  fbFilter.Q.value = 0.7;
+
+  // subtle high-pass on wet to keep vocal clear
+  const wetHp = ctx.createBiquadFilter();
+  wetHp.type = 'highpass';
+  wetHp.frequency.value = 120;
 
   input.connect(dry);
   dry.connect(output);
 
   input.connect(delayNode);
-  delayNode.connect(wet);
+  delayNode.connect(wetHp);
+  wetHp.connect(wet);
   wet.connect(output);
 
   delayNode.connect(fbFilter);
@@ -40,13 +47,13 @@ export function createNodes(ctx, params = {}) {
 
   return {
     input, output,
-    nodes: [input, dry, wet, delayNode, fbGain, fbFilter, output],
+    nodes: [input, dry, wet, delayNode, fbGain, fbFilter, wetHp, output],
     update(p) {
-      if (p.delay !== undefined) delayNode.delayTime.setTargetAtTime(p.delay, ctx.currentTime, 0.04);
-      if (p.feedback !== undefined) fbGain.gain.setTargetAtTime(Math.min(0.85, p.feedback), ctx.currentTime, 0.04);
+      if (p.delay !== undefined) delayNode.delayTime.setTargetAtTime(p.delay, ctx.currentTime, 0.05);
+      if (p.feedback !== undefined) fbGain.gain.setTargetAtTime(Math.min(0.75, p.feedback), ctx.currentTime, 0.05);
       if (p.mix !== undefined) {
-        dry.gain.setTargetAtTime(1 - p.mix, ctx.currentTime, 0.04);
-        wet.gain.setTargetAtTime(p.mix, ctx.currentTime, 0.04);
+        dry.gain.setTargetAtTime(1 - p.mix, ctx.currentTime, 0.05);
+        wet.gain.setTargetAtTime(p.mix, ctx.currentTime, 0.05);
       }
     }
   };

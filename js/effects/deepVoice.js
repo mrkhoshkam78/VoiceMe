@@ -8,7 +8,7 @@ import { VOCAL_PRESETS } from '../audio-engine/PitchProcessor.js';
 export const meta = {
   id: 'deepVoice',
   name: 'صدای مردانه',
-  description: 'Pitch و Formant مردانه طبیعی – سرعت پخش ثابت',
+  description: 'صدای مردانه‌تر و پرتر؛ بدون تغییر سرعت یا مدت فایل',
   icon: 'deep',
   category: 'voice',
   defaultParams: { intensity: 0.75 },

@@ -169,34 +169,35 @@ export function processPitchPreserveDurationSync(buffer, pitchRatio = 1.0, forma
  * Convenience presets for vocal gender (pitchRatio, formantShift, eq hints)
  */
 export const VOCAL_PRESETS = {
+  /* Controlled ranges to avoid chipmunk / robotic artifacts */
   girl: {
-    pitchRatio: 1.18,      // ~ +2.9 semitones – controlled, not chipmunk
-    formantShift: 0.35,
-    highShelf: 5,
-    presence: 4,
-    lowCut: 120
+    pitchRatio: 1.12,      // ~ +2.0 st
+    formantShift: 0.28,
+    highShelf: 3.5,
+    presence: 3,
+    lowCut: 110
   },
   female: {
-    pitchRatio: 1.12,      // ~ +2.0 st
-    formantShift: 0.25,
-    highShelf: 4,
-    presence: 3.5,
-    lowCut: 100
+    pitchRatio: 1.08,      // ~ +1.3 st
+    formantShift: 0.18,
+    highShelf: 3,
+    presence: 2.8,
+    lowCut: 95
   },
   woman: {
-    pitchRatio: 1.07,      // ~ +1.2 st
-    formantShift: 0.12,
-    highShelf: 3,
-    presence: 2.5,
-    lowCut: 85
+    pitchRatio: 1.05,      // ~ +0.85 st
+    formantShift: 0.1,
+    highShelf: 2.2,
+    presence: 2,
+    lowCut: 80
   },
   male: {
-    pitchRatio: 0.88,      // ~ -2.2 st – natural male, not cartoon deep
-    formantShift: -0.28,
-    highShelf: -1.5,
-    presence: 1.5,
-    lowCut: 60,
-    lowShelf: 4
+    pitchRatio: 0.92,      // ~ -1.4 st – natural masculine body
+    formantShift: -0.2,
+    highShelf: -1,
+    presence: 1.2,
+    lowCut: 55,
+    lowShelf: 3.2
   }
 };
 

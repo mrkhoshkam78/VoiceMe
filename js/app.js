@@ -1,5 +1,5 @@
 /**
- * Audio Editor V1.06 – Application (UI layer only) — Professional Vocal Engine
+ * Audio Editor V1.07 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
@@ -165,6 +165,7 @@ class App {
       exportChannels: id('exportChannels'),
       exportSampleRate: id('exportSampleRate'),
       speedSelect: id('speedSelect'),
+      playerStatus: id('playerStatus'),
       fileCover: id('fileCover'),
       fileCoverCanvas: id('fileCoverCanvas'),
       fileCoverFallback: id('fileCoverFallback'),
@@ -181,6 +182,10 @@ class App {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('ae-theme', next);
+    // Force one viz frame with new tokens
+    if (this.engine?.isPlaying) {
+      /* continuous loop picks new CSS vars automatically */
+    }
   }
 
   _initEffectState() {
@@ -476,6 +481,11 @@ class App {
     }
     if (this.$.playBtn) {
       this.$.playBtn.classList.toggle('is-playing', !!playing);
+    }
+    const st = this.$.playerStatus || document.getElementById('playerStatus');
+    if (st) {
+      st.textContent = playing ? 'در حال پخش' : 'آماده';
+      st.classList.toggle('is-paused', !playing);
     }
   }
 
@@ -836,7 +846,7 @@ class App {
       }
 
       const theme = document.documentElement.getAttribute('data-theme');
-      ctx.fillStyle = theme === 'light' ? '#f0f4f8' : '#0b1220';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim() || getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || (theme === 'light' ? '#f0f4f8' : '#0b1220');
       ctx.fillRect(0, 0, w, h);
 
       if (data) {
@@ -850,7 +860,7 @@ class App {
 
       // Organic bezier wave
       ctx.beginPath();
-      ctx.strokeStyle = theme === 'light' ? '#2563eb' : '#60a5fa';
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--waveform').trim() || (theme === 'light' ? '#2563eb' : '#60a5fa');
       ctx.lineWidth = 2.2;
       ctx.lineJoin = 'round';
 
@@ -871,7 +881,7 @@ class App {
       ctx.lineTo(w, mid);
       ctx.lineTo(0, mid);
       ctx.closePath();
-      ctx.fillStyle = theme === 'light' ? 'rgba(37,99,235,0.08)' : 'rgba(96,165,250,0.1)';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--waveform-fill').trim() || (theme === 'light' ? 'rgba(37,99,235,0.08)' : 'rgba(96,165,250,0.1)');
       ctx.fill();
 
       this._vizRaf = requestAnimationFrame(draw);

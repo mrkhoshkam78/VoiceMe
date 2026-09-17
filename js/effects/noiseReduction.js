@@ -12,7 +12,7 @@ import { clamp } from '../utils/helpers.js';
 export const meta = {
   id: 'noiseReduction',
   name: 'کاهش نویز',
-  description: 'کاهش نویز پس‌زمینه، هیس و هم',
+  description: 'کاهش نویز پس‌زمینه با حفظ طبیعی بودن صدا',
   icon: 'noise',
   category: 'enhancement',
   defaultParams: {

@@ -13,7 +13,7 @@ import {
 export const meta = {
   id: 'autotune',
   name: 'اتوتیون',
-  description: 'تصحیح هوشمند Pitch برای صدا و آواز',
+  description: 'خطاهای کوک را به نت مناسب نزدیک می‌کند',
   icon: 'autotune',
   category: 'voice',
   defaultParams: {
