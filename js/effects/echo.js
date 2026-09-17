@@ -1,60 +1,71 @@
-import { createGain } from './baseEffect.js';
+/**
+ * Echo / Delay – V2.4.4
+ * Feedback hard-capped, filtered feedback path, mix control.
+ * Units: delay (s), feedback (0–0.75), mix (0–1)
+ */
+import { createGain, createBiquad } from './baseEffect.js';
 
 export const meta = {
   id: 'echo',
-  name: 'اکو',
-  description: 'تکرار کنترل‌شده صدا با Delay، Feedback و Mix',
+  name: 'اکو (Echo)',
+  description: 'تأخیر کنترل‌شده با فیلتر و سقف Feedback',
   icon: 'echo',
-  category: 'environment',
-  defaultParams: { delay: 0.28, feedback: 0.35, mix: 0.4 }
+  category: 'space',
+  defaultParams: { delay: 0.28, feedback: 0.32, mix: 0.35 },
+  paramUnits: { delay: 's', feedback: 'ratio', mix: 'ratio' },
+  paramRanges: {
+    delay: [0.05, 0.9],
+    feedback: [0, 0.75],
+    mix: [0, 1]
+  }
 };
 
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, Number(v) || lo));
+}
+
 export function createNodes(ctx, params = {}) {
-  const delayTime = params.delay ?? 0.28;
-  const feedback = Math.min(0.75, params.feedback ?? 0.35);
-  const mix = params.mix ?? 0.4;
+  let delayTime = clamp(params.delay ?? 0.28, 0.05, 0.9);
+  let feedbackAmt = clamp(params.feedback ?? 0.32, 0, 0.75);
+  let mix = clamp(params.mix ?? 0.35, 0, 1);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
   const dry = createGain(ctx, 1 - mix);
   const wet = createGain(ctx, mix);
 
-  const delayNode = ctx.createDelay(2.5);
+  const delayNode = ctx.createDelay(1.0);
   delayNode.delayTime.value = delayTime;
 
-  const fbGain = createGain(ctx, feedback);
-  const fbFilter = ctx.createBiquadFilter();
-  fbFilter.type = 'lowpass';
-  fbFilter.frequency.value = 3800;
-  fbFilter.Q.value = 0.7;
-
-  // subtle high-pass on wet to keep vocal clear
-  const wetHp = ctx.createBiquadFilter();
-  wetHp.type = 'highpass';
-  wetHp.frequency.value = 120;
+  const feedback = createGain(ctx, feedbackAmt);
+  // Filter feedback loop – prevent harsh buildup
+  const fbHp = createBiquad(ctx, 'highpass', 120, 0.7);
+  const fbLp = createBiquad(ctx, 'lowpass', 5500, 0.7);
 
   input.connect(dry);
   dry.connect(output);
 
   input.connect(delayNode);
-  delayNode.connect(wetHp);
-  wetHp.connect(wet);
-  wet.connect(output);
+  delayNode.connect(fbHp);
+  fbHp.connect(fbLp);
+  fbLp.connect(feedback);
+  feedback.connect(delayNode); // feedback loop
 
-  delayNode.connect(fbFilter);
-  fbFilter.connect(fbGain);
-  fbGain.connect(delayNode);
+  delayNode.connect(wet);
+  wet.connect(output);
 
   return {
     input, output,
-    nodes: [input, dry, wet, delayNode, fbGain, fbFilter, wetHp, output],
+    nodes: [input, dry, wet, delayNode, feedback, fbHp, fbLp, output],
     update(p) {
-      if (p.delay !== undefined) delayNode.delayTime.setTargetAtTime(p.delay, ctx.currentTime, 0.05);
-      if (p.feedback !== undefined) fbGain.gain.setTargetAtTime(Math.min(0.75, p.feedback), ctx.currentTime, 0.05);
-      if (p.mix !== undefined) {
-        dry.gain.setTargetAtTime(1 - p.mix, ctx.currentTime, 0.05);
-        wet.gain.setTargetAtTime(p.mix, ctx.currentTime, 0.05);
-      }
+      const t = ctx.currentTime;
+      delayTime = clamp(p.delay ?? delayTime, 0.05, 0.9);
+      feedbackAmt = clamp(p.feedback ?? feedbackAmt, 0, 0.75);
+      mix = clamp(p.mix ?? mix, 0, 1);
+      delayNode.delayTime.setTargetAtTime(delayTime, t, 0.05);
+      feedback.gain.setTargetAtTime(feedbackAmt, t, 0.05);
+      dry.gain.setTargetAtTime(1 - mix, t, 0.04);
+      wet.gain.setTargetAtTime(mix, t, 0.04);
     }
   };
 }

@@ -169,43 +169,43 @@ export function processPitchPreserveDurationSync(buffer, pitchRatio = 1.0, forma
  * Convenience presets for vocal gender (pitchRatio, formantShift, eq hints)
  */
 export const VOCAL_PRESETS = {
-  /* Professional female/male – moderate pitch, distinct formant + timbre */
+  /* V2.4.4 forensic-tuned: moderate pitch, independent formant, natural timbre */
   girl: {
-    pitchRatio: 1.10,       // ~ +1.65 st – youthful, not chipmunk
-    formantShift: 0.32,
-    highShelf: 3.2,
-    presence: 3.5,
-    lowCut: 115,
-    body: -1.5,             // less chest
-    air: 2.5
+    pitchRatio: 1.08,       // ~ +1.3 st – youthful, avoid chipmunk
+    formantShift: 0.28,
+    highShelf: 2.6,
+    presence: 3.0,
+    lowCut: 110,
+    body: -1.2,
+    air: 2.0
   },
   female: {
-    pitchRatio: 1.06,       // ~ +1.0 st – natural adult female
-    formantShift: 0.22,
-    highShelf: 2.4,
-    presence: 2.8,
-    lowCut: 90,
-    body: 0.5,
-    air: 1.8
+    pitchRatio: 1.05,       // ~ +0.85 st – natural adult female
+    formantShift: 0.20,
+    highShelf: 2.0,
+    presence: 2.4,
+    lowCut: 85,
+    body: 0.4,
+    air: 1.5
   },
   woman: {
-    pitchRatio: 1.03,       // ~ +0.5 st – mature, warmer
-    formantShift: 0.12,
-    highShelf: 1.5,
-    presence: 2.0,
-    lowCut: 75,
-    body: 1.8,
-    air: 0.8
+    pitchRatio: 1.025,      // ~ +0.4 st – mature warmer
+    formantShift: 0.10,
+    highShelf: 1.2,
+    presence: 1.8,
+    lowCut: 70,
+    body: 1.6,
+    air: 0.6
   },
   male: {
-    pitchRatio: 0.93,       // ~ -1.25 st
-    formantShift: -0.22,
-    highShelf: -0.8,
-    presence: 1.2,
-    lowCut: 55,
-    lowShelf: 3.0,
-    body: 2.5,
-    air: -0.5
+    pitchRatio: 0.94,       // ~ -1.05 st – natural male, not cartoon deep
+    formantShift: -0.20,
+    highShelf: -0.6,
+    presence: 1.0,
+    lowCut: 50,
+    lowShelf: 2.4,
+    body: 2.2,
+    air: -0.4
   }
 };
 

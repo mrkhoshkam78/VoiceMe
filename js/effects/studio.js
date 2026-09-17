@@ -1,13 +1,27 @@
+/**
+ * Studio Vocal Chain – V2.4.4
+ * HPF → presence EQ → de-ess → gentle comp → filtered ambience → mix
+ */
 import { createGain, createBiquad } from './baseEffect.js';
 
 export const meta = {
   id: 'studio',
   name: 'استودیو',
-  description: 'زنجیره استودیو: EQ اصلاحی، فشرده‌سازی ملایم، de-ess و ambience',
+  description: 'زنجیره استودیو: EQ اصلاحی، فشرده‌سازی، de-ess و فضای کنترل‌شده',
   icon: 'studio',
-  category: 'environment',
-  defaultParams: { roomSize: 0.5, wet: 0.32, intensity: 0.65 }
+  category: 'space',
+  defaultParams: { roomSize: 0.45, wet: 0.28, intensity: 0.6 },
+  paramUnits: { roomSize: 'ratio', wet: 'ratio', intensity: 'ratio' },
+  paramRanges: {
+    roomSize: [0.1, 1],
+    wet: [0, 0.6],
+    intensity: [0, 1]
+  }
 };
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, Number(v) || lo));
+}
 
 function createImpulse(ctx, duration, decay) {
   const sr = ctx.sampleRate;
@@ -20,40 +34,40 @@ function createImpulse(ctx, duration, decay) {
       const env = Math.exp(-decay * t);
       const noise = Math.random() * 2 - 1;
       let early = 0;
-      if (t < 0.09) early = Math.exp(-28 * t) * (Math.random() * 0.55);
-      data[i] = (noise * 0.45 + early) * env;
+      if (t < 0.08) early = Math.exp(-30 * t) * (Math.random() * 0.5);
+      data[i] = (noise * 0.4 + early) * env;
     }
   }
   return impulse;
 }
 
 export function createNodes(ctx, params = {}) {
-  const roomSize = params.roomSize ?? 0.5;
-  const wetAmt = params.wet ?? 0.32;
-  const intensity = params.intensity ?? 0.65;
+  let roomSize = clamp(params.roomSize ?? 0.45, 0.1, 1);
+  let wetAmt = clamp(params.wet ?? 0.28, 0, 0.6);
+  let intensity = clamp(params.intensity ?? 0.6, 0, 1);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
   const dry = createGain(ctx, 1 - wetAmt);
   const wet = createGain(ctx, wetAmt * intensity);
 
-  const hp = createBiquad(ctx, 'highpass', 55, 0.7);
-  const presence = createBiquad(ctx, 'peaking', 3400, 1.0, 2 + intensity * 2);
-  const air = createBiquad(ctx, 'highshelf', 7500, 1, 1.2 + intensity);
-  // Gentle de-ess
-  const deess = createBiquad(ctx, 'peaking', 6500, 1.6, -1.2 - intensity * 1.5);
+  const hp = createBiquad(ctx, 'highpass', 60, 0.7);
+  const presence = createBiquad(ctx, 'peaking', 3200, 1.0, 1.5 + intensity * 2);
+  const air = createBiquad(ctx, 'highshelf', 8000, 0.8, 0.8 + intensity * 1.2);
+  const deess = createBiquad(ctx, 'peaking', 6500, 1.5, -1 - intensity * 1.8);
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -20;
+  comp.threshold.value = -22;
   comp.knee.value = 12;
-  comp.ratio.value = 2.4;
+  comp.ratio.value = 2.2;
   comp.attack.value = 0.012;
-  comp.release.value = 0.22;
+  comp.release.value = 0.2;
 
   const convolver = ctx.createConvolver();
-  convolver.buffer = createImpulse(ctx, 0.9 + roomSize * 1.8, 1.7 + roomSize * 1.6);
+  convolver.buffer = createImpulse(ctx, 0.7 + roomSize * 1.6, 1.8 + roomSize * 1.4);
 
-  const wetLp = createBiquad(ctx, 'lowpass', 6800 - roomSize * 1800, 0.7);
+  const wetLp = createBiquad(ctx, 'lowpass', 6200 - roomSize * 1500, 0.7);
+  const wetHp = createBiquad(ctx, 'highpass', 150, 0.7);
 
   input.connect(hp);
   hp.connect(presence);
@@ -65,21 +79,25 @@ export function createNodes(ctx, params = {}) {
   dry.connect(output);
 
   comp.connect(convolver);
-  convolver.connect(wetLp);
+  convolver.connect(wetHp);
+  wetHp.connect(wetLp);
   wetLp.connect(wet);
   wet.connect(output);
 
   return {
     input, output,
-    nodes: [input, hp, presence, air, deess, comp, dry, convolver, wetLp, wet, output],
+    nodes: [input, hp, presence, air, deess, comp, dry, convolver, wetHp, wetLp, wet, output],
     update(p) {
-      const w = p.wet ?? wetAmt;
-      const inten = p.intensity ?? intensity;
-      dry.gain.setTargetAtTime(1 - w, ctx.currentTime, 0.05);
-      wet.gain.setTargetAtTime(w * inten, ctx.currentTime, 0.05);
-      if (p.intensity !== undefined) {
-        presence.gain.setTargetAtTime(2 + inten * 2, ctx.currentTime, 0.05);
-      }
+      const t = ctx.currentTime;
+      wetAmt = clamp(p.wet ?? wetAmt, 0, 0.6);
+      intensity = clamp(p.intensity ?? intensity, 0, 1);
+      roomSize = clamp(p.roomSize ?? roomSize, 0.1, 1);
+      dry.gain.setTargetAtTime(1 - wetAmt, t, 0.05);
+      wet.gain.setTargetAtTime(wetAmt * intensity, t, 0.05);
+      presence.gain.setTargetAtTime(1.5 + intensity * 2, t, 0.05);
+      air.gain.setTargetAtTime(0.8 + intensity * 1.2, t, 0.05);
+      deess.gain.setTargetAtTime(-1 - intensity * 1.8, t, 0.05);
+      wetLp.frequency.setTargetAtTime(6200 - roomSize * 1500, t, 0.08);
     }
   };
 }

@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="VoiceMe – Professional Vocal Studio. Vocal Changer · Music Maker.">
-  <title>VoiceMe V2.4.0 — Studio Menu · AutoTune Profiles · Dotted Visualizer</title>
+  <title>VoiceMe V2.4.4 — Studio Menu · AutoTune Profiles · Dotted Visualizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-  <header class="header">
+<body data-page="landing">
+  <header class="header app-header" id="appHeader">
     <div class="logo">
       <div class="logo-mark">
         <svg viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
@@ -20,7 +20,7 @@
         <h1>VoiceMe</h1>
         <span class="brand-sub" data-i18n="brand_sub">Vocal Changer · Music Maker</span>
       </div>
-      <span class="version-badge">V2.4.0</span>
+      <span class="version-badge">V2.4.4</span>
     </div>
 
     
@@ -81,7 +81,7 @@
     <div class="studio-bg" aria-hidden="true">
       <canvas id="studioBg"></canvas>
     </div>
-    <button type="button" class="btn btn-ghost btn-sm side-toggle" id="btnSideToggle" aria-label="اطلاعات فایل">اطلاعات فایل</button>
+    <button type="button" class="btn btn-ghost btn-sm side-toggle" id="btnSideToggle" aria-label="اطلاعات فایل" data-i18n="file_info">اطلاعات فایل</button>
     <div class="editor-layout">
     <div class="editor-main">
     <!-- Upload -->
@@ -109,8 +109,8 @@
           </div>
         </div>
         <div class="file-card-actions">
-          <button type="button" class="btn btn-ghost btn-sm" id="btnChangeFile">تغییر</button>
-          <button type="button" class="btn btn-danger-ghost btn-sm" id="btnRemoveFile">حذف</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnChangeFile" data-i18n="change_file">تغییر فایل</button>
+          <button type="button" class="btn btn-danger-ghost btn-sm" id="btnRemoveFile" data-i18n="remove_file">حذف فایل</button>
         </div>
       </div>
       <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm,.opus">
@@ -253,7 +253,7 @@
   <!-- Action Bar -->
   <div class="action-bar" id="actionBar">
     <div class="action-bar-inner">
-      <button type="button" class="btn btn-ghost" id="btnReset">بازنشانی</button>
+      <button type="button" class="btn btn-ghost" id="btnReset" data-i18n="reset">بازنشانی</button>
       <button type="button" class="btn btn-success" id="btnExport">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         خروجی WAV
@@ -268,7 +268,46 @@
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
   </div>
 
-  <div class="toast-box" id="toastBox"></div>
+  
+  <!-- App chrome: only interactive when data-menu="open" -->
+  <div id="navOverlay" class="nav-overlay" data-menu-overlay hidden aria-hidden="true"></div>
+  <aside id="navDrawer" class="nav-drawer" data-menu-drawer hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Menu">
+    <div class="nav-drawer-head">
+      <span class="nav-drawer-title">VoiceMe</span>
+      <button type="button" class="nav-close" id="navClose" aria-label="Close" data-i18n-aria="close">×</button>
+    </div>
+    <nav class="nav-drawer-body" id="navDrawerBody">
+      <button type="button" class="nav-link-item" data-action="home" data-i18n="nav_home">خانه</button>
+      <button type="button" class="nav-link-item" data-action="export" data-i18n="nav_export">خروجی گرفتن</button>
+
+      <div class="theme-accordion">
+        <button type="button" class="theme-accordion-btn" id="themeAccordionBtn" aria-expanded="false">
+          <span data-i18n="nav_theme">تم سایت</span>
+          <span class="theme-acc-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="theme-accordion-panel" id="themeAccordionPanel" hidden>
+          <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="nebula">
+            <span class="theme-dot" style="background:#8b5cf6"></span>
+            <span class="theme-name" data-i18n="theme_violet">Violet Studio</span>
+          </button>
+          <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="ember">
+            <span class="theme-dot" style="background:#f97316"></span>
+            <span class="theme-name" data-i18n="theme_sunset">Sunset Vocal</span>
+          </button>
+          <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="arctic">
+            <span class="theme-dot" style="background:#0ea5e9"></span>
+            <span class="theme-name" data-i18n="theme_ocean">Ocean Voice</span>
+          </button>
+          <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="vinyl">
+            <span class="theme-dot" style="background:#c4a574"></span>
+            <span class="theme-name" data-i18n="theme_midnight">Midnight Vocal</span>
+          </button>
+        </div>
+      </div>
+    </nav>
+  </aside>
+
+<div class="toast-box" id="toastBox"></div>
 
   <script>
   // Show error if modules fail (e.g. opened as file:// without a server)
@@ -291,21 +330,5 @@
     }
   }, 2000);
 </script>
-<div class="nav-overlay" id="navOverlay" hidden></div>
-    <aside class="nav-drawer" id="navDrawer" role="dialog" aria-modal="true" aria-label="منوی اصلی" hidden>
-      <div class="nav-drawer-head">
-        <span class="nav-drawer-title">VoiceMe</span>
-        <button type="button" class="nav-close" id="navClose" aria-label="بستن">×</button>
-      </div>
-      <nav class="nav-drawer-body" id="navDrawerBody">
-        <button type="button" class="nav-link-item" data-action="home" data-i18n="nav_home">خانه</button>
-        <button type="button" class="nav-link-item" data-action="export" data-i18n="nav_export">خروجی گرفتن</button>
-        <div class="nav-section-label" data-i18n="nav_theme">تم سایت</div>
-        <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="nebula">Nebula</button>
-        <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="ember">Ember Stage</button>
-        <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="arctic">Arctic Signal</button>
-        <button type="button" class="nav-link-item theme-opt" data-action="theme-set" data-theme="vinyl">Vinyl Lounge</button>
-      </nav>
-    </aside>
 </body>
 </html>

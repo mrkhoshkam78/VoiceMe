@@ -125,9 +125,8 @@ class App {
   }
 
   _enterEditor() {
-    // Keep header/menu above editor layers
+    document.body.setAttribute('data-page', 'editor');
     document.body.classList.add('in-editor');
-    // Menu uses capture listeners; ensure drawer is still in DOM
     if (!this._menuBound) this._initStudioMenu();
     if (this.$.landing) {
       this.$.landing.classList.add('hidden');
@@ -216,39 +215,42 @@ class App {
   }
 
   _applyI18n() {
+    const lang = this.lang || 'fa';
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
+    document.body.dir = lang === 'fa' ? 'rtl' : 'ltr';
+
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.getAttribute('data-i18n');
-      const val = t(key, this.lang);
+      const val = t(key, lang);
       if (val) el.textContent = val;
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
       const key = el.getAttribute('data-i18n-placeholder');
-      const val = t(key, this.lang);
+      const val = t(key, lang);
       if (val) el.setAttribute('placeholder', val);
     });
     document.querySelectorAll('[data-i18n-aria]').forEach(el => {
       const key = el.getAttribute('data-i18n-aria');
-      const val = t(key, this.lang);
+      const val = t(key, lang);
       if (val) el.setAttribute('aria-label', val);
     });
-    // Dynamic status
+
     const st = document.getElementById('playerStatus');
     if (st) {
-      st.textContent = this.engine?.isPlaying ? t('playing', this.lang) : t('ready', this.lang);
+      st.textContent = this.engine?.isPlaying ? t('playing', lang) : t('ready', lang);
     }
-    // Drawer title stays brand
-    const drawerTitle = document.querySelector('.nav-drawer-title');
-    if (drawerTitle) drawerTitle.textContent = 'VoiceMe';
-    // Re-render sidebar labels via effect meta (names already FA in registry)
+    // Re-render dynamic lists so labels follow language where possible
     try { this._renderSidebar?.(); } catch (_) {}
     try { this._updateSideStatus?.(); } catch (_) {}
+    this._markActiveTheme?.();
   }
+
 
   _tt(key) { return t(key, this.lang || 'fa'); }
 
 
   _initStudioMenu() {
-    // Idempotent: safe to call again after entering editor
     if (this._menuBound) return;
     this._menuBound = true;
 
@@ -256,19 +258,47 @@ class App {
     const drawer = document.getElementById('navDrawer');
     const overlay = document.getElementById('navOverlay');
     const closeBtn = document.getElementById('navClose');
+    const accBtn = document.getElementById('themeAccordionBtn');
+    const accPanel = document.getElementById('themeAccordionPanel');
+
     if (!btn || !drawer) {
-      console.warn('[Menu] missing elements', { btn: !!btn, drawer: !!drawer });
+      console.warn('[Menu] elements missing');
       this._menuBound = false;
       return;
     }
 
+    // Ensure fully inert when closed
+    const setClosedDom = () => {
+      drawer.classList.remove('open');
+      overlay?.classList.remove('open');
+      document.documentElement.removeAttribute('data-menu');
+      document.body.classList.remove('menu-open');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.classList.remove('is-open');
+      drawer.setAttribute('hidden', '');
+      drawer.setAttribute('aria-hidden', 'true');
+      drawer.setAttribute('inert', '');
+      if (overlay) {
+        overlay.setAttribute('hidden', '');
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.setAttribute('inert', '');
+      }
+    };
+
     const openMenu = () => {
       drawer.removeAttribute('hidden');
-      if (overlay) overlay.removeAttribute('hidden');
-      requestAnimationFrame(() => {
-        drawer.classList.add('open');
-        overlay?.classList.add('open');
-      });
+      drawer.removeAttribute('inert');
+      drawer.setAttribute('aria-hidden', 'false');
+      if (overlay) {
+        overlay.removeAttribute('hidden');
+        overlay.removeAttribute('inert');
+        overlay.setAttribute('aria-hidden', 'false');
+      }
+      // reflow then animate
+      void drawer.offsetWidth;
+      document.documentElement.setAttribute('data-menu', 'open');
+      drawer.classList.add('open');
+      overlay?.classList.add('open');
       btn.setAttribute('aria-expanded', 'true');
       btn.classList.add('is-open');
       document.body.classList.add('menu-open');
@@ -278,24 +308,23 @@ class App {
     const closeMenu = () => {
       drawer.classList.remove('open');
       overlay?.classList.remove('open');
+      document.documentElement.removeAttribute('data-menu');
       btn.setAttribute('aria-expanded', 'false');
       btn.classList.remove('is-open');
       document.body.classList.remove('menu-open');
-      const finish = () => {
-        drawer.setAttribute('hidden', '');
-        overlay?.setAttribute('hidden', '');
-      };
-      setTimeout(finish, 300);
+      setTimeout(setClosedDom, 300);
     };
+
+    // Initial closed state (no layout impact)
+    setClosedDom();
 
     this._openMenu = openMenu;
     this._closeMenu = closeMenu;
 
-    // Use capture so nothing in editor can swallow the click
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (drawer.classList.contains('open')) closeMenu();
+      if (document.documentElement.getAttribute('data-menu') === 'open') closeMenu();
       else openMenu();
     }, true);
 
@@ -305,16 +334,33 @@ class App {
       closeMenu();
     }, true);
 
-    overlay?.addEventListener('click', (e) => {
-      e.preventDefault();
-      closeMenu();
-    }, true);
+    overlay?.addEventListener('click', () => closeMenu(), true);
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && drawer.classList.contains('open')) closeMenu();
+      if (e.key === 'Escape' && document.documentElement.getAttribute('data-menu') === 'open') {
+        closeMenu();
+      }
     });
 
-    // Event delegation on drawer body — works even if items re-rendered
+    // Theme accordion (independent of menu open/close persistence via local flag)
+    if (accBtn && accPanel) {
+      const savedAcc = localStorage.getItem('ae-theme-acc') === '1';
+      if (savedAcc) {
+        accPanel.hidden = false;
+        accBtn.setAttribute('aria-expanded', 'true');
+        accBtn.classList.add('open');
+      }
+      accBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const open = accPanel.hidden;
+        accPanel.hidden = !open;
+        accBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        accBtn.classList.toggle('open', open);
+        localStorage.setItem('ae-theme-acc', open ? '1' : '0');
+      });
+    }
+
     drawer.addEventListener('click', (e) => {
       const el = e.target.closest('[data-action]');
       if (!el || !drawer.contains(el)) return;
@@ -324,44 +370,50 @@ class App {
 
       if (action === 'home') {
         closeMenu();
-        // Show landing / scroll top
-        const landing = document.getElementById('landing');
-        const main = document.getElementById('mainApp');
-        if (landing) {
-          landing.classList.remove('hidden');
-          landing.style.display = '';
-          landing.removeAttribute('aria-hidden');
-        }
-        if (main) main.style.display = 'none';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        this._goHome();
       } else if (action === 'export') {
         closeMenu();
-        const main = document.getElementById('mainApp');
-        if (main && main.style.display === 'none') {
-          // need file first
-          this._toast?.('info', 'خروجی', 'ابتدا یک فایل بارگذاری کنید');
-        } else {
-          // ensure export controls visible / trigger export flow
-          document.getElementById('playerPanel')?.scrollIntoView({ behavior: 'smooth' });
-          // open format if available then export
-          setTimeout(() => {
-            if (typeof this._export === 'function') this._export();
-            else document.getElementById('btnExport')?.click();
-          }, 200);
+        if (document.body.getAttribute('data-page') !== 'editor') {
+          this._toast?.('info', this._tt('export') || 'Export', this._tt('upload_first') || 'ابتدا فایل بارگذاری کنید');
+          return;
         }
+        document.getElementById('playerPanel')?.scrollIntoView({ behavior: 'smooth' });
+        setTimeout(() => {
+          if (typeof this._export === 'function') this._export();
+          else document.getElementById('btnExport')?.click();
+        }, 150);
       } else if (action === 'theme-set') {
         const th = el.getAttribute('data-theme');
         if (th) this._setTheme(th);
         this._markActiveTheme();
-        // keep menu open so user can compare themes
       }
     });
+  }
+
+  _goHome() {
+    document.body.setAttribute('data-page', 'landing');
+    document.body.classList.remove('in-editor', 'is-playing-pulse');
+    const landing = document.getElementById('landing');
+    const main = document.getElementById('mainApp');
+    if (landing) {
+      landing.classList.remove('hidden');
+      landing.style.display = '';
+      landing.style.pointerEvents = '';
+      landing.removeAttribute('aria-hidden');
+    }
+    if (main) main.style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (typeof this._startLandingViz === 'function' && this.$.landingViz) {
+      try { this._startLandingViz(); } catch (_) {}
+    }
   }
 
   _markActiveTheme() {
     const cur = document.documentElement.getAttribute('data-theme') || 'nebula';
     document.querySelectorAll('.theme-opt').forEach(btn => {
-      btn.classList.toggle('active-theme', btn.getAttribute('data-theme') === cur);
+      const on = btn.getAttribute('data-theme') === cur;
+      btn.classList.toggle('active-theme', on);
+      btn.setAttribute('aria-current', on ? 'true' : 'false');
     });
   }
 
@@ -754,6 +806,9 @@ class App {
     }
     const panel = this.$.playerPanel || document.getElementById('playerPanel');
     if (panel) panel.classList.toggle('is-pulsing', !!playing);
+    // Global ambient pulse for entire editor (theme-aware CSS)
+    document.body.classList.toggle('is-playing-pulse', !!playing);
+    document.documentElement.classList.toggle('is-playing-pulse', !!playing);
     const st = this.$.playerStatus || document.getElementById('playerStatus');
     if (st) {
       st.textContent = playing ? 'در حال پخش' : 'آماده';

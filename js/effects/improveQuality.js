@@ -1,46 +1,53 @@
 /**
- * Improve Quality – corrective vocal enhancement (not just treble boost)
+ * Improve Quality – V2.4.4 professional corrective chain
+ * HPF → mud cut → body → harsh cut → presence → air → soft comp
+ * NOT a treble/volume booster.
  */
 import { createGain, createBiquad } from './baseEffect.js';
 
 export const meta = {
   id: 'improveQuality',
   name: 'بهبود کیفیت',
-  description: 'اصلاح mud، harshness و افزایش Presence طبیعی',
+  description: 'اصلاح mud/harshness و Presence طبیعی — نه فقط Treble',
   icon: 'quality',
   category: 'tone',
-  defaultParams: { intensity: 0.65, clarity: 0.5, warmth: 0.4 }
+  defaultParams: { intensity: 0.6, clarity: 0.55, warmth: 0.35 },
+  paramUnits: { intensity: 'ratio', clarity: 'ratio', warmth: 'ratio' },
+  paramRanges: {
+    intensity: [0, 1],
+    clarity: [0, 1],
+    warmth: [0, 1]
+  }
 };
 
+function clamp01(v) {
+  return Math.max(0, Math.min(1, Number(v) || 0));
+}
+
 export function createNodes(ctx, params = {}) {
-  const intensity = params.intensity ?? 0.65;
-  const clarity = params.clarity ?? 0.5;
-  const warmth = params.warmth ?? 0.4;
+  let intensity = clamp01(params.intensity ?? 0.6);
+  let clarity = clamp01(params.clarity ?? 0.55);
+  let warmth = clamp01(params.warmth ?? 0.35);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
-  // Sub rumble out
-  const hp = createBiquad(ctx, 'highpass', 55, 0.7);
-  // Reduce boxiness / mud (200–400 Hz)
-  const mud = createBiquad(ctx, 'peaking', 280, 1.1, -1.5 - intensity * 2.5);
-  // Mild body restore
-  const body = createBiquad(ctx, 'peaking', 180, 0.9, warmth * 2.2);
-  // Tame harshness ~3–5 kHz
-  const harsh = createBiquad(ctx, 'peaking', 4200, 1.4, -0.8 - clarity * 2);
-  // Presence for intelligibility
-  const presence = createBiquad(ctx, 'peaking', 3200, 1.2, 1.2 + intensity * 2.5 * clarity);
-  // Soft air, not harsh treble
-  const air = createBiquad(ctx, 'highshelf', 9000, 0.7, 0.6 + intensity * 1.2 * clarity);
+  const hp = createBiquad(ctx, 'highpass', 50 + intensity * 15, 0.7);
+  const mud = createBiquad(ctx, 'peaking', 280, 1.1, -1.2 - intensity * 2.2);
+  const body = createBiquad(ctx, 'peaking', 170, 0.9, warmth * 2.0);
+  const harsh = createBiquad(ctx, 'peaking', 4200, 1.4, -0.6 - clarity * 2.2);
+  const presence = createBiquad(ctx, 'peaking', 3100, 1.15, 1.0 + intensity * 2.2 * clarity);
+  // Soft air — capped to avoid brittle highs
+  const air = createBiquad(ctx, 'highshelf', 9500, 0.7, Math.min(2.2, 0.4 + intensity * 1.0 * clarity));
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -22;
-  comp.knee.value = 12;
-  comp.ratio.value = 1.8;
+  comp.threshold.value = -24;
+  comp.knee.value = 14;
+  comp.ratio.value = 1.7;
   comp.attack.value = 0.015;
-  comp.release.value = 0.2;
+  comp.release.value = 0.22;
 
-  const makeup = createGain(ctx, 1.02);
+  const makeup = createGain(ctx, 1.0);
 
   input.connect(hp);
   hp.connect(mud);
@@ -56,14 +63,16 @@ export function createNodes(ctx, params = {}) {
     input, output,
     nodes: [input, hp, mud, body, harsh, presence, air, comp, makeup, output],
     update(p) {
-      const inten = p.intensity ?? intensity;
-      const cl = p.clarity ?? clarity;
-      const w = p.warmth ?? warmth;
-      mud.gain.setTargetAtTime(-1.5 - inten * 2.5, ctx.currentTime, 0.05);
-      body.gain.setTargetAtTime(w * 2.2, ctx.currentTime, 0.05);
-      harsh.gain.setTargetAtTime(-0.8 - cl * 2, ctx.currentTime, 0.05);
-      presence.gain.setTargetAtTime(1.2 + inten * 2.5 * cl, ctx.currentTime, 0.05);
-      air.gain.setTargetAtTime(0.6 + inten * 1.2 * cl, ctx.currentTime, 0.05);
+      intensity = clamp01(p.intensity ?? intensity);
+      clarity = clamp01(p.clarity ?? clarity);
+      warmth = clamp01(p.warmth ?? warmth);
+      const t = ctx.currentTime;
+      hp.frequency.setTargetAtTime(50 + intensity * 15, t, 0.05);
+      mud.gain.setTargetAtTime(-1.2 - intensity * 2.2, t, 0.05);
+      body.gain.setTargetAtTime(warmth * 2.0, t, 0.05);
+      harsh.gain.setTargetAtTime(-0.6 - clarity * 2.2, t, 0.05);
+      presence.gain.setTargetAtTime(1.0 + intensity * 2.2 * clarity, t, 0.05);
+      air.gain.setTargetAtTime(Math.min(2.2, 0.4 + intensity * 1.0 * clarity), t, 0.05);
     }
   };
 }

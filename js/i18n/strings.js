@@ -31,6 +31,14 @@ export const STRINGS = {
     nav_home: 'خانه',
     nav_export: 'خروجی گرفتن',
     nav_theme: 'تم سایت',
+    theme_violet: 'Violet Studio',
+    theme_sunset: 'Sunset Vocal',
+    theme_ocean: 'Ocean Voice',
+    theme_midnight: 'Midnight Vocal',
+    close: 'بستن',
+    upload_first: 'ابتدا یک فایل صوتی بارگذاری کنید',
+    effects_title: 'افکت‌ها',
+    chain_title: 'زنجیره افکت',
     file_info: 'اطلاعات فایل',
     name: 'نام',
     format: 'فرمت',
@@ -69,7 +77,15 @@ export const STRINGS = {
     nav_settings: 'تنظیمات',
     nav_home: 'خانه',
     nav_export: 'خروجی گرفتن',
-    nav_theme: 'تم سایت'
+    nav_theme: 'تم سایت',
+    theme_violet: 'Violet Studio',
+    theme_sunset: 'Sunset Vocal',
+    theme_ocean: 'Ocean Voice',
+    theme_midnight: 'Midnight Vocal',
+    close: 'بستن',
+    upload_first: 'ابتدا یک فایل صوتی بارگذاری کنید',
+    effects_title: 'افکت‌ها',
+    chain_title: 'زنجیره افکت'
   },
   en: {
     brand_sub: 'Vocal Changer · Music Maker',
@@ -102,6 +118,14 @@ export const STRINGS = {
     nav_home: 'Home',
     nav_export: 'Export',
     nav_theme: 'Theme',
+    theme_violet: 'Violet Studio',
+    theme_sunset: 'Sunset Vocal',
+    theme_ocean: 'Ocean Voice',
+    theme_midnight: 'Midnight Vocal',
+    close: 'Close',
+    upload_first: 'Please upload an audio file first',
+    effects_title: 'Effects',
+    chain_title: 'Effect chain',
     file_info: 'File Info',
     name: 'Name',
     format: 'Format',
@@ -140,7 +164,15 @@ export const STRINGS = {
     nav_settings: 'Settings',
     nav_home: 'Home',
     nav_export: 'Export',
-    nav_theme: 'Theme'
+    nav_theme: 'Theme',
+    theme_violet: 'Violet Studio',
+    theme_sunset: 'Sunset Vocal',
+    theme_ocean: 'Ocean Voice',
+    theme_midnight: 'Midnight Vocal',
+    close: 'Close',
+    upload_first: 'Please upload an audio file first',
+    effects_title: 'Effects',
+    chain_title: 'Effect chain'
   }
 };
 

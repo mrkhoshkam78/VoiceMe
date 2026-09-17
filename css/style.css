@@ -3193,3 +3193,215 @@ body.in-editor .action-bar {
   --waveform: #7c3aed;
   --header-bg: rgba(255,255,255,0.88);
 }
+
+/* ============================================================
+   V2.4.1 — Page state, closed menu inert, RTL-from-right, pulse
+   ============================================================ */
+
+/* --- Upload/Landing: no app header --- */
+body[data-page="landing"] .app-header,
+body[data-page="landing"] #appHeader {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+body[data-page="editor"] .app-header,
+body[data-page="editor"] #appHeader {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  height: auto !important;
+  z-index: 9000 !important;
+}
+
+/* --- Menu CLOSED: fully out of interaction & layout --- */
+.nav-overlay[hidden],
+.nav-drawer[hidden],
+html:not([data-menu="open"]) .nav-overlay,
+html:not([data-menu="open"]) .nav-drawer {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  inset: auto !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  transform: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* --- Menu OPEN --- */
+html[data-menu="open"] .nav-overlay {
+  display: block !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  opacity: 1 !important;
+  z-index: 100000 !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(2px);
+  transition: opacity 0.28s ease;
+}
+
+html[data-menu="open"] .nav-drawer {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  /* Always from physical RIGHT (user request for RTL VoiceMe) */
+  right: 0 !important;
+  left: auto !important;
+  width: min(320px, 90vw) !important;
+  height: auto !important;
+  opacity: 1 !important;
+  z-index: 100001 !important;
+  flex-direction: column !important;
+  background: var(--bg-elevated) !important;
+  color: var(--text) !important;
+  border-left: 1px solid var(--border-strong) !important;
+  border-right: none !important;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.4) !important;
+  overflow: hidden !important;
+  transform: translateX(0) !important;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Enter animation: from right (off-screen) → on-screen */
+html[data-menu="open"] .nav-drawer:not(.open) {
+  transform: translateX(100%) !important;
+}
+html[data-menu="open"] .nav-drawer.open {
+  transform: translateX(0) !important;
+}
+
+/* Theme accordion */
+.theme-accordion {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.theme-accordion-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-align: start;
+}
+.theme-accordion-btn .theme-acc-chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.6;
+}
+.theme-accordion-btn.open .theme-acc-chevron,
+.theme-accordion-btn[aria-expanded="true"] .theme-acc-chevron {
+  transform: rotate(180deg);
+}
+.theme-accordion-panel {
+  border-top: 1px solid var(--border);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: themePanelIn 0.22s ease;
+}
+.theme-accordion-panel[hidden] {
+  display: none !important;
+}
+@keyframes themePanelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.theme-opt {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  text-align: start !important;
+}
+.theme-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--bg-elevated), 0 0 0 3px rgba(255,255,255,0.15);
+}
+.theme-name {
+  font-weight: 600;
+}
+
+/* --- Global playback ambient pulse (theme tokens) --- */
+body.in-editor.is-playing-pulse::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 40%,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    color-mix(in srgb, var(--accent-cyan, var(--accent)) 10%, transparent) 45%,
+    transparent 70%
+  );
+  animation: globalPulse 4.5s ease-in-out infinite;
+  opacity: 0.85;
+}
+body.in-editor .main,
+body.in-editor .app-header {
+  position: relative;
+  z-index: 1;
+}
+@keyframes globalPulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.in-editor.is-playing-pulse::before {
+    animation: none;
+    opacity: 0.25;
+  }
+}
+
+/* Landing full bleed without header gap */
+body[data-page="landing"] .landing {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Contrast boosts per theme */
+[data-theme="arctic"] {
+  --text: #0a1628 !important;
+  --text-secondary: #2c4a60 !important;
+  --text-muted: #4a6a80 !important;
+}
+[data-theme="vinyl"] {
+  --text: #faf6f0 !important;
+  --text-secondary: #d4c8b4 !important;
+}
+[data-theme="ember"] {
+  --text: #fffaf5 !important;
+  --text-secondary: #e8d5c0 !important;
+}
