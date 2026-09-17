@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="VoiceMe – Professional Vocal Studio. Vocal Changer · Music Maker.">
-  <title>VoiceMe V2.2.0 — Professional Vocal Studio</title>
+  <title>VoiceMe V2.3.0 — Studio Menu · AutoTune Profiles · Dotted Visualizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,56 +20,56 @@
         <h1>VoiceMe</h1>
         <span class="brand-sub" data-i18n="brand_sub">Vocal Changer · Music Maker</span>
       </div>
-      <span class="version-badge">V2.2.0</span>
+      <span class="version-badge">V2.3.0</span>
     </div>
 
-    <div class="header-center">
-      <div class="menu-root" id="menuRoot">
-        <button type="button" class="menu-trigger" id="menuTrigger" aria-haspopup="true" aria-expanded="false">
-          <span class="menu-trigger-icon" aria-hidden="true">☰</span>
-          <span data-i18n="menu">منو</span>
-          <span class="chevron" aria-hidden="true">▾</span>
-        </button>
-        <div class="menu-panel" id="menuPanel" hidden>
-          <div class="menu-col">
-            <button type="button" class="menu-item has-sub" data-sub="studio">
-              <span data-i18n="nav_studio">استودیو</span><span class="chevron">▸</span>
-            </button>
-            <div class="submenu" data-subpanel="studio" hidden>
-              <button type="button" class="menu-item" data-action="scroll" data-target="playerPanel" data-i18n="nav_preview">پیش‌نمایش</button>
-              <button type="button" class="menu-item" data-action="scroll" data-target="tracksPanel" data-i18n="nav_tracks">تراک‌ها</button>
-              <button type="button" class="menu-item" data-action="scroll" data-target="effectsWorkspace" data-i18n="nav_effects">افکت‌ها</button>
-            </div>
-            <button type="button" class="menu-item has-sub" data-sub="vocal">
-              <span data-i18n="nav_vocal">صدا</span><span class="chevron">▸</span>
-            </button>
-            <div class="submenu" data-subpanel="vocal" hidden>
-              <button type="button" class="menu-item" data-action="fx" data-fx="femaleVoice" data-i18n="fx_female">صدای زنانه</button>
-              <button type="button" class="menu-item" data-action="fx" data-fx="deepVoice" data-i18n="fx_male">صدای مردانه</button>
-              <button type="button" class="menu-item" data-action="fx" data-fx="autotune" data-i18n="fx_autotune">AutoTune</button>
-              <button type="button" class="menu-item" data-action="fx" data-fx="breathSibilance" data-i18n="fx_breath">نفس و سیبیلانس</button>
-            </div>
-            <button type="button" class="menu-item has-sub" data-sub="effects">
-              <span data-i18n="nav_effects">افکت‌ها</span><span class="chevron">▸</span>
-            </button>
-            <div class="submenu" data-subpanel="effects" hidden>
-              <button type="button" class="menu-item" data-action="scroll" data-target="effectsWorkspace" data-i18n="nav_all_fx">همه افکت‌ها</button>
-              <button type="button" class="menu-item" data-action="fx" data-fx="bassBoost">Bass Boost</button>
-              <button type="button" class="menu-item" data-action="fx" data-fx="echo">Echo</button>
-              <button type="button" class="menu-item" data-action="fx" data-fx="studio">Studio</button>
-            </div>
-            <button type="button" class="menu-item has-sub" data-sub="export">
-              <span data-i18n="nav_export">خروجی</span><span class="chevron">▸</span>
-            </button>
-            <div class="submenu" data-subpanel="export" hidden>
-              <button type="button" class="menu-item" data-action="export" data-format="wav">WAV</button>
-              <button type="button" class="menu-item" data-action="export" data-format="mp3">MP3</button>
-              <button type="button" class="menu-item" data-action="export" data-format="flac">FLAC</button>
-            </div>
-          </div>
-        </div>
+    
+    <button type="button" class="hamburger-btn" id="hamburgerBtn" aria-label="منو" aria-expanded="false" aria-controls="navDrawer">
+      <span class="hb-line"></span>
+      <span class="hb-line"></span>
+      <span class="hb-line"></span>
+    </button>
+
+    <div class="nav-overlay" id="navOverlay" hidden></div>
+    <aside class="nav-drawer" id="navDrawer" role="dialog" aria-modal="true" aria-label="منوی اصلی" hidden>
+      <div class="nav-drawer-head">
+        <span class="nav-drawer-title">VoiceMe</span>
+        <button type="button" class="nav-close" id="navClose" aria-label="بستن">×</button>
       </div>
-    </div>
+      <nav class="nav-drawer-body">
+        <details class="nav-group" open>
+          <summary>استودیو</summary>
+          <button type="button" class="nav-link-item" data-action="scroll" data-target="playerPanel">پیش‌نمایش</button>
+          <button type="button" class="nav-link-item" data-action="scroll" data-target="tracksPanel">ترک‌ها</button>
+          <button type="button" class="nav-link-item" data-action="scroll" data-target="effectsWorkspace">افکت‌ها</button>
+        </details>
+        <details class="nav-group">
+          <summary>افکت‌های صوتی</summary>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="femaleVoice">صدای زنانه</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="deepVoice">صدای مردانه</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="bassBoost">Bass</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="echo">Echo</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="studio">استودیو</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="improveQuality">بهبود کیفیت</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="noiseReduction">کاهش نویز</button>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="breathSibilance">نفس و سیبیلانس</button>
+        </details>
+        <details class="nav-group">
+          <summary>AutoTune</summary>
+          <button type="button" class="nav-link-item" data-action="fx" data-fx="autotune">باز کردن AutoTune</button>
+        </details>
+        <details class="nav-group">
+          <summary>خروجی (Export)</summary>
+          <button type="button" class="nav-link-item" data-action="export" data-format="wav">خروجی WAV</button>
+          <button type="button" class="nav-link-item" data-action="export" data-format="mp3">خروجی MP3</button>
+          <button type="button" class="nav-link-item" data-action="export" data-format="flac">خروجی FLAC</button>
+        </details>
+        <details class="nav-group">
+          <summary>تنظیمات</summary>
+          <button type="button" class="nav-link-item" data-action="theme">تغییر تم</button>
+        </details>
+      </nav>
+    </aside>
 
     <div class="header-actions" id="headerActions">
       <select id="langSelect" class="hdr-select lang-select" aria-label="Language">

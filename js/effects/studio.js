@@ -3,7 +3,7 @@ import { createGain, createBiquad } from './baseEffect.js';
 export const meta = {
   id: 'studio',
   name: 'استودیو',
-  description: 'حس فضای استودیو با بازتاب ملایم و وضوح کنترل‌شده',
+  description: 'زنجیره استودیو: EQ اصلاحی، فشرده‌سازی ملایم، de-ess و ambience',
   icon: 'studio',
   category: 'environment',
   defaultParams: { roomSize: 0.5, wet: 0.32, intensity: 0.65 }
@@ -39,7 +39,9 @@ export function createNodes(ctx, params = {}) {
 
   const hp = createBiquad(ctx, 'highpass', 55, 0.7);
   const presence = createBiquad(ctx, 'peaking', 3400, 1.0, 2 + intensity * 2);
-  const air = createBiquad(ctx, 'highshelf', 7500, 1, 1.8);
+  const air = createBiquad(ctx, 'highshelf', 7500, 1, 1.2 + intensity);
+  // Gentle de-ess
+  const deess = createBiquad(ctx, 'peaking', 6500, 1.6, -1.2 - intensity * 1.5);
 
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -20;
@@ -56,7 +58,8 @@ export function createNodes(ctx, params = {}) {
   input.connect(hp);
   hp.connect(presence);
   presence.connect(air);
-  air.connect(comp);
+  air.connect(deess);
+  deess.connect(comp);
 
   comp.connect(dry);
   dry.connect(output);
@@ -68,7 +71,7 @@ export function createNodes(ctx, params = {}) {
 
   return {
     input, output,
-    nodes: [input, hp, presence, air, comp, dry, convolver, wetLp, wet, output],
+    nodes: [input, hp, presence, air, deess, comp, dry, convolver, wetLp, wet, output],
     update(p) {
       const w = p.wet ?? wetAmt;
       const inten = p.intensity ?? intensity;

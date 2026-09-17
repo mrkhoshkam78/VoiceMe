@@ -1013,65 +1013,79 @@ class App {
     }
   }
 
-  /* ── Fluid Wave Visualizer ── */
+  /* ── Dotted Equalizer Visualizer ── */
   _startVizLoop() {
     this._stopVizLoop();
     const canvas = this.$.vizCanvas;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const bins = 128;
-    if (!this._smoothedWave) this._smoothedWave = new Float32Array(bins);
+    const cols = 40;
+    if (!this._smoothedWave) this._smoothedWave = new Float32Array(cols);
 
     const draw = () => {
-      if (!this.engine.isPlaying) return;
-      const data = this.engine.getAnalyserTimeData();
+      const playing = this.engine.isPlaying;
+      const freq = this.engine.getAnalyserFreqData?.() || null;
+      const time = this.engine.getAnalyserTimeData?.() || null;
       const dpr = window.devicePixelRatio || 1;
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
+      if (w < 2 || h < 2) {
+        this._vizRaf = requestAnimationFrame(draw);
+        return;
+      }
+      if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
 
-      const theme = document.documentElement.getAttribute('data-theme');
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim() || getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || (theme === 'light' ? '#f0f4f8' : '#0b1220');
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim()
+        || getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+        || '#0c1224';
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, w, h);
 
-      if (data) {
-        // Downsample + smooth
-        const step = Math.floor(data.length / bins);
-        for (let i = 0; i < bins; i++) {
-          const v = (data[i * step] - 128) / 128;
-          this._smoothedWave[i] += (v - this._smoothedWave[i]) * 0.35;
+      // Update levels from analyser
+      for (let i = 0; i < cols; i++) {
+        let target = 0.08; // idle baseline
+        if (freq && freq.length) {
+          const idx = Math.floor((i / cols) * Math.min(freq.length * 0.7, freq.length - 1));
+          target = Math.min(1, (freq[idx] / 255) * 1.15);
+        } else if (time && time.length) {
+          const step = Math.floor(time.length / cols);
+          let sum = 0;
+          for (let k = 0; k < step; k++) sum += Math.abs(time[i * step + k] - 128);
+          target = Math.min(1, (sum / step) / 64);
         }
+        if (!playing) target *= 0.25;
+        const smooth = playing ? 0.35 : 0.12;
+        this._smoothedWave[i] += (target - this._smoothedWave[i]) * smooth;
       }
 
-      // Organic bezier wave
-      ctx.beginPath();
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--waveform').trim() || (theme === 'light' ? '#2563eb' : '#a78bfa');
-      ctx.lineWidth = 2.2;
-      ctx.lineJoin = 'round';
+      const gap = 3;
+      const colW = (w - gap * (cols - 1)) / cols;
+      const dotR = Math.max(1.2, Math.min(2.8, colW * 0.28));
+      const dotGap = dotR * 2.4;
 
-      const mid = h / 2;
-      for (let i = 0; i < bins; i++) {
-        const x = (i / (bins - 1)) * w;
-        const y = mid + this._smoothedWave[i] * mid * 0.85;
-        if (i === 0) ctx.moveTo(x, y);
-        else {
-          const prevX = ((i - 1) / (bins - 1)) * w;
-          const cpx = (prevX + x) / 2;
-          ctx.quadraticCurveTo(prevX, mid + this._smoothedWave[i - 1] * mid * 0.85, cpx, y);
+      for (let i = 0; i < cols; i++) {
+        const level = this._smoothedWave[i];
+        const colH = Math.max(dotR * 2, level * (h - 8));
+        const x = i * (colW + gap) + colW / 2;
+        const dots = Math.max(2, Math.floor(colH / dotGap));
+        for (let d = 0; d < dots; d++) {
+          const y = h - 4 - d * dotGap;
+          const t = d / Math.max(1, dots - 1);
+          // Cyan → Violet → Magenta
+          const r = Math.round(34 + t * 180);
+          const g = Math.round(211 - t * 100);
+          const b = Math.round(238 - t * 30 + (1 - t) * 20);
+          const a = 0.35 + level * 0.55;
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(${r},${g},${Math.min(255, b)},${a})`;
+          ctx.arc(x, y, dotR, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
-      ctx.stroke();
-
-      // Soft fill
-      ctx.lineTo(w, mid);
-      ctx.lineTo(0, mid);
-      ctx.closePath();
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--waveform-fill').trim() || (theme === 'light' ? 'rgba(37,99,235,0.08)' : 'rgba(96,165,250,0.1)');
-      ctx.fill();
 
       this._vizRaf = requestAnimationFrame(draw);
     };
