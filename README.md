@@ -1,21 +1,11 @@
-# VoiceMe V2.0.0 — Vocal Changer · Music Maker
+# VoiceMe V2.1.0 — Responsive Studio · Real-Time Audio
 
-## Audio Quality Root Cause (fixed)
-Cascaded DynamicsCompressors across many effects + no inter-stage peak limiting caused warble/mud/metallic artifacts on multi-effect export.
-
-## Fixes
-- Single-pass offline render with peak limiting between stages
-- Master soft-limiter + headroom
-- Only one vocal pitch stage (female OR deep)
-- Softened compressor ratios
-- Professional Bass Boost with makeup compensation
-- Non-destructive: original buffer never mutated
-
-## Product
-- Identity: Vocal Changer · Music Maker
-- Default theme: Light
-- i18n: فارسی / English
-- Header navigation + Export
+## Highlights
+- **Laptop-first layout**: compact spacing, side panel stacks under 1280px, short-height media query
+- **Hierarchical Menu**: Studio / Vocal / Effects / Export with submenus (replaces crowded header nav)
+- **Animated studio background**: soft multi-color blobs, reduced on mobile, respects prefers-reduced-motion
+- **Track-card Preview**: waveform-centered audio workspace
+- **Audio quality**: inherits V2.0 single-pass render + peak limiting + soft compressors
 
 ## Run
 ```bash

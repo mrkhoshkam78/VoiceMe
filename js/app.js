@@ -1,5 +1,5 @@
 /**
- * Audio Editor V2.0.0 – Application (UI layer only) — Professional Vocal Engine
+ * Audio Editor V2.1.0 – Application (UI layer only) — Professional Vocal Engine
  * Audio logic lives in audio-engine/
  */
 
@@ -51,6 +51,8 @@ class App {
 
     this._initTheme();
     this._initLang();
+    this._initStudioMenu();
+    this._initStudioBg();
     this._initEffectState();
     this._cacheDom();
     this._renderSidebar();
@@ -216,6 +218,129 @@ class App {
   }
 
   _tt(key) { return t(key, this.lang || 'fa'); }
+
+
+  _initStudioMenu() {
+    const trigger = document.getElementById('menuTrigger');
+    const panel = document.getElementById('menuPanel');
+    const root = document.getElementById('menuRoot');
+    if (!trigger || !panel) return;
+
+    const closeAll = () => {
+      panel.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      panel.querySelectorAll('.submenu').forEach(s => { s.hidden = true; });
+    };
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = panel.hidden;
+      if (open) {
+        panel.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+      } else closeAll();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (root && !root.contains(e.target)) closeAll();
+    });
+
+    panel.querySelectorAll('.menu-item.has-sub').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-sub');
+        const sub = panel.querySelector(`[data-subpanel="${id}"]`);
+        if (!sub) return;
+        const was = sub.hidden;
+        panel.querySelectorAll('.submenu').forEach(s => { s.hidden = true; });
+        sub.hidden = !was ? true : false;
+      });
+    });
+
+    panel.querySelectorAll('.menu-item[data-action]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = btn.getAttribute('data-action');
+        if (action === 'scroll') {
+          const t = document.getElementById(btn.getAttribute('data-target'));
+          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (action === 'fx') {
+          const id = btn.getAttribute('data-fx');
+          if (id && this.effectState[id] !== undefined) {
+            this._selectEffect(id);
+            const t = document.getElementById('effectsWorkspace');
+            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        } else if (action === 'export') {
+          const fmt = btn.getAttribute('data-format');
+          const sel = document.getElementById('exportFormat');
+          if (sel && fmt) {
+            // ensure option exists
+            const opt = [...sel.options].find(o => o.value === fmt || o.value.includes(fmt));
+            if (opt) sel.value = opt.value;
+          }
+          this._export();
+        }
+        closeAll();
+      });
+    });
+  }
+
+  _initStudioBg() {
+    const canvas = document.getElementById('studioBg');
+    if (!canvas) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const ctx = canvas.getContext('2d');
+    let w, h, raf;
+    const isMobile = () => window.innerWidth < 640;
+    const blobs = Array.from({ length: isMobile() ? 3 : 5 }, (_, i) => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 0.12 + Math.random() * 0.18,
+      vx: (Math.random() - 0.5) * 0.00025,
+      vy: (Math.random() - 0.5) * 0.00025,
+      hue: (i * 55 + 200) % 360
+    }));
+
+    const resize = () => {
+      w = canvas.width = window.innerWidth * (window.devicePixelRatio > 1 ? 1 : 1);
+      h = canvas.height = window.innerHeight;
+      // lower res on mobile for perf
+      if (isMobile()) {
+        canvas.width = Math.floor(window.innerWidth * 0.6);
+        canvas.height = Math.floor(window.innerHeight * 0.6);
+      }
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const draw = () => {
+      const theme = document.documentElement.getAttribute('data-theme') || 'light';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cw = canvas.width, ch = canvas.height;
+      blobs.forEach(b => {
+        b.x += b.vx; b.y += b.vy;
+        if (b.x < -0.2 || b.x > 1.2) b.vx *= -1;
+        if (b.y < -0.2 || b.y > 1.2) b.vy *= -1;
+        const grd = ctx.createRadialGradient(
+          b.x * cw, b.y * ch, 0,
+          b.x * cw, b.y * ch, b.r * Math.min(cw, ch)
+        );
+        const alpha = theme === 'light' ? 0.22 : 0.28;
+        grd.addColorStop(0, `hsla(${b.hue}, 70%, 60%, ${alpha})`);
+        grd.addColorStop(1, `hsla(${b.hue}, 70%, 50%, 0)`);
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(b.x * cw, b.y * ch, b.r * Math.min(cw, ch), 0, Math.PI * 2);
+        ctx.fill();
+      });
+      raf = requestAnimationFrame(draw);
+    };
+    // throttle: run at ~30fps via skipping is complex; simple RAF is ok with few blobs
+    draw();
+    this._studioBgRaf = raf;
+  }
 
   _initTheme() {
     const saved = localStorage.getItem('ae-theme') || 'light'; // V2 default Light
@@ -579,6 +704,10 @@ class App {
       const tn = document.getElementById('trackNameA');
       const td = document.getElementById('trackDurA');
       if (tn) tn.textContent = info.name || 'Track A';
+      const tcn = document.getElementById('trackCardName');
+      if (tcn) tcn.textContent = info.name || 'Preview';
+      const ffm = document.getElementById('fileFormatMini');
+      if (ffm) ffm.textContent = (info.name || '').split('.').pop()?.toUpperCase() || '';
       if (td) td.textContent = formatDuration(info.duration || 0);
       try { if (typeof this._populateExportFormats === 'function') this._populateExportFormats(); } catch(_){}
 

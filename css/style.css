@@ -1792,3 +1792,301 @@ input[type="range"]::-webkit-slider-thumb,
 
 html[lang="en"] { direction: ltr; }
 html[lang="fa"] { direction: rtl; }
+
+/* ============================================================
+   V2.1.0 — Studio Layout, Hierarchical Menu, Animated BG
+   Spacing scale: 4 / 8 / 12 / 16 / 24 / 32
+   ============================================================ */
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --header-h: 56px;
+}
+
+/* Root cause fix: header was packing nav+export+lang into one row → overflow at 1280 */
+.header {
+  height: auto;
+  min-height: var(--header-h);
+  padding: var(--space-2) var(--space-4);
+  gap: var(--space-3);
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.header .logo {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.logo-text h1 { font-size: 1rem; }
+.brand-sub { max-width: 140px; font-size: 0.65rem; }
+
+.header-center {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.header-actions {
+  flex: 0 0 auto;
+  gap: var(--space-2);
+  flex-wrap: nowrap;
+}
+
+/* Hierarchical menu */
+.menu-root { position: relative; }
+.menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+.menu-trigger:hover { border-color: var(--accent); background: var(--surface-hover); }
+.menu-trigger .chevron { font-size: 0.7rem; opacity: 0.7; }
+.menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-width: min(280px, 90vw);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 200;
+}
+html[dir="rtl"] .menu-panel { transform: translateX(50%); }
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: start;
+  min-height: 40px;
+}
+.menu-item:hover { background: var(--surface-hover); }
+.menu-item .chevron { opacity: 0.5; font-size: 0.75rem; }
+.submenu {
+  margin: 0 0 var(--space-2) var(--space-3);
+  padding-inline-start: var(--space-2);
+  border-inline-start: 2px solid var(--border);
+}
+.submenu .menu-item { font-size: 0.8rem; min-height: 36px; padding: 8px 10px; }
+
+/* Studio animated background */
+.studio-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.45;
+}
+.studio-bg canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.main {
+  position: relative;
+  z-index: 1;
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-6) + 56px);
+  gap: var(--space-4);
+  box-sizing: border-box;
+}
+
+/* Track card / player redesign */
+.player-panel.track-card {
+  display: none;
+  padding: var(--space-4);
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  gap: 0;
+}
+.player-panel.track-card.visible { display: block; }
+
+.track-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.track-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.track-card-icon { font-size: 1.25rem; }
+.track-card-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.track-card-meta-line {
+  display: flex;
+  gap: var(--space-2);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.track-card-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.viz-area {
+  height: clamp(72px, 12vh, 120px);
+  border-radius: 12px;
+  margin-bottom: var(--space-3);
+}
+
+.player-controls {
+  gap: var(--space-3);
+}
+
+/* Compact tracks on laptop */
+.tracks-panel {
+  gap: var(--space-3);
+  margin: 0;
+}
+.track-card {
+  padding: var(--space-3) var(--space-4);
+}
+
+.effects-workspace.visible {
+  gap: var(--space-4);
+  margin-top: 0;
+}
+
+.editor-layout {
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+}
+.editor-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Rounded seekbars */
+.seek-track,
+input[type="range"] {
+  height: 7px;
+  border-radius: 999px;
+}
+.seek-track::-webkit-slider-thumb,
+input[type="range"]::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+}
+
+/* Hide old full nav if residual */
+.main-nav, .nav-burger, .header-export { display: none !important; }
+
+/* ---------- Laptop-first breakpoints (root cause: dense vertical + wide header) ---------- */
+@media (max-width: 1440px) {
+  .main { max-width: 1040px; padding: var(--space-3) var(--space-4); gap: var(--space-3); }
+  .editor-main { gap: var(--space-3); }
+  .viz-area { height: 96px; }
+}
+
+@media (max-width: 1366px) {
+  .main { max-width: 980px; }
+  .brand-sub { display: none; }
+  .version-badge { font-size: 0.65rem; }
+  .side-panel { font-size: 0.85rem; }
+}
+
+@media (max-width: 1280px) {
+  .main { max-width: 100%; padding: var(--space-3); }
+  .editor-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .side-panel {
+    position: static;
+    width: 100%;
+  }
+  .side-toggle { display: inline-flex; }
+  .track-card-name { max-width: 160px; }
+}
+
+@media (max-width: 900px) {
+  .header { flex-wrap: wrap; }
+  .header-center { order: 3; width: 100%; justify-content: stretch; }
+  .menu-trigger { width: 100%; justify-content: center; }
+  .menu-panel {
+    inset-inline-start: 0;
+    inset-inline-end: 0;
+    transform: none;
+    width: 100%;
+    max-width: none;
+  }
+  html[dir="rtl"] .menu-panel { transform: none; }
+  .track-card-head { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 640px) {
+  :root { --header-h: 52px; }
+  .main { padding: var(--space-2); padding-bottom: 72px; gap: var(--space-2); }
+  .viz-area { height: 80px; }
+  .play-btn { width: 44px; height: 44px; }
+  .studio-bg { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-bg { display: none; }
+  .play-btn .ring { animation: none !important; }
+  * { scroll-behavior: auto !important; }
+}
+
+@media (max-height: 800px) and (min-width: 900px) {
+  /* Laptop short height: compact vertical rhythm */
+  .main { gap: var(--space-2); padding-top: var(--space-2); }
+  .viz-area { height: 72px; }
+  .upload-zone { padding: var(--space-4) var(--space-3); }
+  .player-panel.track-card { padding: var(--space-3); }
+  .track-card { padding: var(--space-2) var(--space-3); }
+}

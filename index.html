@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="VoiceMe – Vocal Changer · Music Maker. Professional vocal effects and high-quality export.">
-  <title>VoiceMe V2.0.0 — Vocal Changer · Music Maker</title>
+  <title>VoiceMe V2.1.0 — Responsive Studio · Real-Time Audio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,41 +20,63 @@
         <h1>VoiceMe</h1>
         <span class="brand-sub" data-i18n="brand_sub">Vocal Changer · Music Maker</span>
       </div>
-      <span class="version-badge">V2.0.0</span>
+      <span class="version-badge">V2.1.0</span>
     </div>
-    
-    <nav class="main-nav" id="mainNav" aria-label="Main">
-      <a href="#landing" class="nav-link" data-nav="home" data-i18n="nav_home">خانه</a>
-      <a href="#mainApp" class="nav-link" data-nav="editor" data-i18n="nav_editor">ویرایشگر</a>
-      <a href="#effectsWorkspace" class="nav-link" data-nav="effects" data-i18n="nav_effects">افکت‌ها</a>
-      <button type="button" class="nav-link nav-btn" id="navExport" data-i18n="nav_export">خروجی</button>
-    </nav>
-    <button type="button" class="nav-burger" id="navBurger" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
-<div class="header-actions" id="headerActions">
-      <div class="header-export" id="headerExport" hidden>
-        <select id="exportFormat" class="hdr-select" aria-label="فرمت خروجی"></select>
-        <select id="exportBitrate" class="hdr-select" aria-label="بیت‌ریت">
-          <option value="128">128k</option>
-          <option value="192" selected>192k</option>
-          <option value="256">256k</option>
-          <option value="320">320k</option>
-        </select>
-        <select id="exportChannels" class="hdr-select" aria-label="کانال">
-          <option value="2">Stereo</option>
-          <option value="1">Mono</option>
-        </select>
-        <button type="button" class="btn btn-success btn-sm" id="btnExportHdr">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export
+
+    <div class="header-center">
+      <div class="menu-root" id="menuRoot">
+        <button type="button" class="menu-trigger" id="menuTrigger" aria-haspopup="true" aria-expanded="false">
+          <span class="menu-trigger-icon" aria-hidden="true">☰</span>
+          <span data-i18n="menu">منو</span>
+          <span class="chevron" aria-hidden="true">▾</span>
         </button>
+        <div class="menu-panel" id="menuPanel" hidden>
+          <div class="menu-col">
+            <button type="button" class="menu-item has-sub" data-sub="studio">
+              <span data-i18n="nav_studio">استودیو</span><span class="chevron">▸</span>
+            </button>
+            <div class="submenu" data-subpanel="studio" hidden>
+              <button type="button" class="menu-item" data-action="scroll" data-target="playerPanel" data-i18n="nav_preview">پیش‌نمایش</button>
+              <button type="button" class="menu-item" data-action="scroll" data-target="tracksPanel" data-i18n="nav_tracks">تراک‌ها</button>
+              <button type="button" class="menu-item" data-action="scroll" data-target="effectsWorkspace" data-i18n="nav_effects">افکت‌ها</button>
+            </div>
+            <button type="button" class="menu-item has-sub" data-sub="vocal">
+              <span data-i18n="nav_vocal">صدا</span><span class="chevron">▸</span>
+            </button>
+            <div class="submenu" data-subpanel="vocal" hidden>
+              <button type="button" class="menu-item" data-action="fx" data-fx="femaleVoice" data-i18n="fx_female">صدای زنانه</button>
+              <button type="button" class="menu-item" data-action="fx" data-fx="deepVoice" data-i18n="fx_male">صدای مردانه</button>
+              <button type="button" class="menu-item" data-action="fx" data-fx="autotune" data-i18n="fx_autotune">AutoTune</button>
+              <button type="button" class="menu-item" data-action="fx" data-fx="breathSibilance" data-i18n="fx_breath">نفس و سیبیلانس</button>
+            </div>
+            <button type="button" class="menu-item has-sub" data-sub="effects">
+              <span data-i18n="nav_effects">افکت‌ها</span><span class="chevron">▸</span>
+            </button>
+            <div class="submenu" data-subpanel="effects" hidden>
+              <button type="button" class="menu-item" data-action="scroll" data-target="effectsWorkspace" data-i18n="nav_all_fx">همه افکت‌ها</button>
+              <button type="button" class="menu-item" data-action="fx" data-fx="bassBoost">Bass Boost</button>
+              <button type="button" class="menu-item" data-action="fx" data-fx="echo">Echo</button>
+              <button type="button" class="menu-item" data-action="fx" data-fx="studio">Studio</button>
+            </div>
+            <button type="button" class="menu-item has-sub" data-sub="export">
+              <span data-i18n="nav_export">خروجی</span><span class="chevron">▸</span>
+            </button>
+            <div class="submenu" data-subpanel="export" hidden>
+              <button type="button" class="menu-item" data-action="export" data-format="wav">WAV</button>
+              <button type="button" class="menu-item" data-action="export" data-format="mp3">MP3</button>
+              <button type="button" class="menu-item" data-action="export" data-format="flac">FLAC</button>
+            </div>
+          </div>
+        </div>
       </div>
+    </div>
+
+    <div class="header-actions" id="headerActions">
       <select id="langSelect" class="hdr-select lang-select" aria-label="Language">
         <option value="fa">فارسی</option>
         <option value="en">English</option>
       </select>
-      <button type="button" class="theme-btn" id="themeBtn" aria-label="تغییر تم" title="تغییر تم">
+      <button type="button" class="theme-btn" id="themeBtn" aria-label="Theme">
         <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
     </div>
@@ -86,6 +108,9 @@
   </section>
 
   <main class="main" id="mainApp" style="display:none">
+    <div class="studio-bg" aria-hidden="true">
+      <canvas id="studioBg"></canvas>
+    </div>
     <button type="button" class="btn btn-ghost btn-sm side-toggle" id="btnSideToggle" aria-label="اطلاعات فایل">اطلاعات فایل</button>
     <div class="editor-layout">
     <div class="editor-main">
@@ -122,31 +147,41 @@
     </section>
 
     <!-- Player -->
-    <section class="player-panel" id="playerPanel">
-      <div class="player-top">
-        <h3>پیش‌نمایش استودیو</h3>
-        <span class="player-status is-paused" id="playerStatus">آماده</span>
-        <div class="speed-wrap">
-          <label for="speedSelect" class="speed-label">سرعت</label>
-          <select id="speedSelect" class="hdr-select" aria-label="سرعت پخش">
-            <option value="0.5">0.5x</option>
-            <option value="0.75">0.75x</option>
-            <option value="1" selected>1.0x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2.0x</option>
-          </select>
+    <section class="player-panel track-card" id="playerPanel">
+      <div class="track-card-head">
+        <div class="track-card-title">
+          <span class="track-card-icon" aria-hidden="true">🎙</span>
+          <div>
+            <div class="track-card-name" id="trackCardName">Preview</div>
+            <div class="track-card-meta-line">
+              <span class="player-status is-paused" id="playerStatus">آماده</span>
+              <span id="fileFormatMini"></span>
+            </div>
+          </div>
         </div>
-        <div class="mode-switch">
-          <button type="button" id="modeOriginal">اصلی</button>
-          <button type="button" class="active" id="modeProcessed">پردازش‌شده</button>
+        <div class="track-card-tools">
+          <div class="speed-wrap">
+            <label for="speedSelect" class="speed-label" data-i18n="speed">سرعت</label>
+            <select id="speedSelect" class="hdr-select" aria-label="Speed">
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1.0x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2.0x</option>
+            </select>
+          </div>
+          <div class="mode-switch">
+            <button type="button" id="modeOriginal" data-i18n="original">اصلی</button>
+            <button type="button" class="active" id="modeProcessed" data-i18n="processed">پردازش‌شده</button>
+          </div>
         </div>
       </div>
       <div class="viz-area">
         <canvas id="vizCanvas"></canvas>
       </div>
       <div class="player-controls">
-        <button type="button" class="play-btn" id="playBtn" aria-label="پخش">
+        <button type="button" class="play-btn" id="playBtn" aria-label="Play">
           <span class="play-rings" aria-hidden="true">
             <span class="ring r1"></span>
             <span class="ring r2"></span>
@@ -159,7 +194,7 @@
             <span id="currentTime">00:00</span>
             <span id="totalTime">00:00</span>
           </div>
-          <input type="range" class="seek-track" id="seekBar" min="0" max="100" value="0" step="0.01" aria-label="موقعیت پخش">
+          <input type="range" class="seek-track" id="seekBar" min="0" max="100" value="0" step="0.01" aria-label="Seek">
         </div>
       </div>
     </section>

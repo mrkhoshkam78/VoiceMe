@@ -49,7 +49,17 @@ export const STRINGS = {
     select_effect: 'یک افکت را انتخاب کنید',
     track_a: 'Track A',
     track_b: 'Track B — خالی',
-    add_track: '+ افزودن فایل'
+    add_track: '+ افزودن فایل',
+    menu: 'منو',
+    nav_studio: 'استودیو',
+    nav_preview: 'پیش‌نمایش',
+    nav_tracks: 'تراک‌ها',
+    nav_vocal: 'صدا',
+    nav_all_fx: 'همه افکت‌ها',
+    fx_female: 'صدای زنانه',
+    fx_male: 'صدای مردانه',
+    fx_autotune: 'AutoTune',
+    fx_breath: 'نفس و سیبیلانس'
   },
   en: {
     brand_sub: 'Vocal Changer · Music Maker',
@@ -100,7 +110,17 @@ export const STRINGS = {
     select_effect: 'Select an effect',
     track_a: 'Track A',
     track_b: 'Track B — empty',
-    add_track: '+ Add file'
+    add_track: '+ Add file',
+    menu: 'Menu',
+    nav_studio: 'Studio',
+    nav_preview: 'Preview',
+    nav_tracks: 'Tracks',
+    nav_vocal: 'Vocal',
+    nav_all_fx: 'All effects',
+    fx_female: 'Female Voice',
+    fx_male: 'Male Voice',
+    fx_autotune: 'AutoTune',
+    fx_breath: 'Breath & Sibilance'
   }
 };
 
