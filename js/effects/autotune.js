@@ -13,7 +13,7 @@ import {
 export const meta = {
   id: 'autotune',
   name: 'اتوتیون',
-  description: 'تصحیح هوشمند Pitch برای صدا و آواز',
+  description: 'خطاهای کوک را به نت مناسب نزدیک می‌کند',
   icon: 'autotune',
   category: 'voice',
   defaultParams: {
@@ -34,50 +34,76 @@ export const meta = {
 };
 
 export const STYLE_PRESETS = {
+  /* Each profile drives offline correction + live character EQ */
   pop: {
     label: 'پاپ',
-    amount: 0.75,
-    retuneSpeed: 0.65,
-    humanize: 0.3,
+    amount: 0.78,
+    retuneSpeed: 0.68,
+    humanize: 0.28,
     mix: 0.9,
     formantPreserve: true,
-    scale: 'major'
+    scale: 'major',
+    presenceGain: 3.2,
+    airGain: 1.8,
+    compRatio: 2.4,
+    compAttack: 0.008,
+    smoothFrames: 3
   },
   traditional: {
     label: 'سنتی',
-    amount: 0.45,
-    retuneSpeed: 0.3,
-    humanize: 0.55,
-    mix: 0.7,
+    amount: 0.42,
+    retuneSpeed: 0.28,
+    humanize: 0.58,
+    mix: 0.72,
     formantPreserve: true,
-    scale: 'minor'
+    scale: 'minor',
+    presenceGain: 1.8,
+    airGain: 0.8,
+    compRatio: 1.6,
+    compAttack: 0.02,
+    smoothFrames: 5
   },
   rock: {
     label: 'راک',
-    amount: 0.55,
-    retuneSpeed: 0.5,
-    humanize: 0.35,
-    mix: 0.8,
+    amount: 0.58,
+    retuneSpeed: 0.52,
+    humanize: 0.32,
+    mix: 0.82,
     formantPreserve: true,
-    scale: 'minor'
+    scale: 'minor',
+    presenceGain: 4.0,
+    airGain: 1.2,
+    compRatio: 2.8,
+    compAttack: 0.006,
+    smoothFrames: 3
   },
   metal: {
     label: 'متال',
-    amount: 0.85,
-    retuneSpeed: 0.85,
-    humanize: 0.15,
+    amount: 0.88,
+    retuneSpeed: 0.9,
+    humanize: 0.12,
     mix: 0.95,
     formantPreserve: false,
-    scale: 'minor'
+    scale: 'minor',
+    presenceGain: 5.0,
+    airGain: 2.8,
+    compRatio: 3.5,
+    compAttack: 0.003,
+    smoothFrames: 1
   },
   rap: {
     label: 'رپ',
-    amount: 0.8,
-    retuneSpeed: 0.9,
-    humanize: 0.25,
+    amount: 0.82,
+    retuneSpeed: 0.92,
+    humanize: 0.2,
     mix: 0.9,
     formantPreserve: true,
-    scale: 'minor'
+    scale: 'minor',
+    presenceGain: 3.5,
+    airGain: 1.0,
+    compRatio: 3.2,
+    compAttack: 0.004,
+    smoothFrames: 2
   }
 };
 
@@ -133,7 +159,14 @@ function nearestScaleMidi(midi, keyIndex, scaleIntervals) {
 /**
  * Detect most likely key & scale from pitch histogram.
  */
+/** Cache: avoid re-analyzing same buffer for key/scale */
+const _analysisCache = new WeakMap();
+
 export function detectKeyAndScale(audioBuffer) {
+  if (!audioBuffer) return { key: 'C', scale: 'major', confidence: 0 };
+  const cached = _analysisCache.get(audioBuffer);
+  if (cached) return { ...cached };
+
   const sr = audioBuffer.sampleRate;
   const length = audioBuffer.length;
   const channels = audioBuffer.numberOfChannels;
@@ -144,7 +177,8 @@ export function detectKeyAndScale(audioBuffer) {
   }
 
   const frameSize = 2048;
-  const hop = 1024;
+  // Adaptive hop: longer files use larger hop for faster analysis
+  const hop = audioBuffer.duration > 60 ? 2048 : (audioBuffer.duration > 20 ? 1536 : 1024);
   const hist = new Float32Array(12); // chroma
   let total = 0;
 
@@ -160,7 +194,9 @@ export function detectKeyAndScale(audioBuffer) {
   }
 
   if (total < 8) {
-    return { key: 'C', scale: 'major', confidence: 0 };
+    const r = { key: 'C', scale: 'major', confidence: 0 };
+    try { _analysisCache.set(audioBuffer, r); } catch (_) {}
+    return r;
   }
 
   // Score each key/scale
@@ -183,7 +219,9 @@ export function detectKeyAndScale(audioBuffer) {
   }
 
   const confidence = clamp(best.score / total, 0, 1);
-  return { key: best.key, scale: best.scale, confidence: Math.round(confidence * 100) };
+  const result = { key: best.key, scale: best.scale, confidence: Math.round(confidence * 100) };
+  try { _analysisCache.set(audioBuffer, result); } catch (_) {}
+  return result;
 }
 
 export function applyStylePreset(style) {
@@ -235,19 +273,36 @@ export function createNodes(ctx, params = {}) {
     input, output, pitchFactor: 1,
     nodes: [input, dry, wet, hp, presence, air, comp, output],
     update(p) {
-      if (p.mix !== undefined) {
-        dry.gain.setTargetAtTime(1 - p.mix, ctx.currentTime, 0.04);
-        wet.gain.setTargetAtTime(p.mix, ctx.currentTime, 0.04);
-      }
+      const a = (p.amount ?? amount) * (p.intensity ?? 1);
+      const m = p.mix ?? mix;
+      const r = p.retuneSpeed ?? retune;
+      const form = p.formantPreserve !== false;
+      const st = STYLE_PRESETS[p.style] || null;
+      dry.gain.setTargetAtTime(1 - m, ctx.currentTime, 0.04);
+      wet.gain.setTargetAtTime(m, ctx.currentTime, 0.04);
+      presence.gain.setTargetAtTime(
+        (st?.presenceGain ?? 2) + a * 2.5, ctx.currentTime, 0.05
+      );
+      air.gain.setTargetAtTime(
+        form ? (st?.airGain ?? 1.2) + a * 0.8 : (st?.airGain ?? 2) + a * 1.5,
+        ctx.currentTime, 0.05
+      );
+      comp.ratio.setTargetAtTime((st?.compRatio ?? 2.2) + r * 1.2, ctx.currentTime, 0.05);
+      comp.attack.setTargetAtTime(st?.compAttack ?? (0.004 + (1 - r) * 0.02), ctx.currentTime, 0.05);
     }
   };
 }
 
 export async function processOfflineBuffer(audioBuffer, params = {}, onProgress) {
-  const amount = (params.amount ?? 0.7) * (params.intensity ?? 1);
-  const humanize = params.humanize ?? 0.25;
+  // Resolve style profile so presets truly change offline correction
+  const styleKey = params.style || 'pop';
+  const preset = STYLE_PRESETS[styleKey] || STYLE_PRESETS.pop;
+  const amount = (params.amount ?? preset.amount ?? 0.7) * (params.intensity ?? 1);
+  const humanize = params.humanize ?? preset.humanize ?? 0.25;
+  const retuneSpeed = params.retuneSpeed ?? preset.retuneSpeed ?? 0.55;
+  const smoothFrames = preset.smoothFrames ?? 3;
   const key = params.key || 'C';
-  const scaleName = params.scale || 'major';
+  const scaleName = params.scale || preset.scale || 'major';
   const keyIndex = NOTE_INDEX[key] ?? 0;
   const scaleIntervals = SCALES[scaleName] || SCALES.major;
 
@@ -272,10 +327,12 @@ export async function processOfflineBuffer(audioBuffer, params = {}, onProgress)
   }
 
   // Smooth
+  // Wider smooth = slower/more natural (traditional); narrow = tight (metal/rap)
+  const half = Math.max(1, Math.round(smoothFrames * (1.2 - retuneSpeed * 0.5)));
   const smoothed = new Float32Array(numFrames);
   for (let f = 0; f < numFrames; f++) {
     let sum = 0, cnt = 0;
-    for (let k = -2; k <= 2; k++) {
+    for (let k = -half; k <= half; k++) {
       const idx = f + k;
       if (idx >= 0 && idx < numFrames && pitches[idx] > 0) {
         sum += pitches[idx]; cnt++;

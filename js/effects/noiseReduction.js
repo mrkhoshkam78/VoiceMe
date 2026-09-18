@@ -12,19 +12,27 @@ import { clamp } from '../utils/helpers.js';
 export const meta = {
   id: 'noiseReduction',
   name: 'کاهش نویز',
-  description: 'کاهش نویز پس‌زمینه، هیس و هم',
+  description: 'کاهش نویز پس‌زمینه با حفظ طبیعی بودن صدا',
   icon: 'noise',
   category: 'enhancement',
   defaultParams: {
-    strength: 0.55,      // 0–1
-    sensitivity: 0.5,  // 0–1
-    intensity: 0.7     // master intensity 0–1
+    strength: 0.5,
+    sensitivity: 0.45,
+    intensity: 0.65
+  },
+  paramUnits: { strength: 'ratio', sensitivity: 'ratio', intensity: 'ratio' },
+  paramRanges: {
+    strength: [0, 1],
+    sensitivity: [0, 1],
+    intensity: [0, 1]
   }
 };
 
+function clamp01(v) { return Math.max(0, Math.min(1, Number(v) || 0)); }
+
 export function createNodes(ctx, params = {}) {
-  const strength = (params.strength ?? 0.55) * (params.intensity ?? 0.7);
-  const sensitivity = params.sensitivity ?? 0.5;
+  let strength = clamp01(params.strength ?? 0.5) * clamp01(params.intensity ?? 0.65);
+  let sensitivity = clamp01(params.sensitivity ?? 0.45);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);

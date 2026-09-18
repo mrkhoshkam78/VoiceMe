@@ -3,7 +3,7 @@ import { createGain } from './baseEffect.js';
 export const meta = {
   id: 'volume',
   name: 'بلندی صدا',
-  description: 'افزایش یا کاهش Volume با Limiter',
+  description: 'بلندی خروجی با محافظت در برابر clipping',
   icon: 'volume',
   category: 'enhancement',
   defaultParams: { gain: 1.0 }
@@ -18,7 +18,7 @@ export function createNodes(ctx, params = {}) {
   const limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -2.5;
   limiter.knee.value = 1.5;
-  limiter.ratio.value = 14;
+  limiter.ratio.value = 8.0;
   limiter.attack.value = 0.001;
   limiter.release.value = 0.04;
 
