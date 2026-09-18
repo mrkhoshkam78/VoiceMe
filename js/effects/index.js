@@ -1,10 +1,9 @@
 /**
- * Effects registry V1.07.1 – categorized + Breath/Sibilance
+ * Effects registry V1.03
  */
 import * as femaleVoice from './femaleVoice.js';
 import * as deepVoice from './deepVoice.js';
 import * as autotune from './autotune.js';
-import * as breathSibilance from './breathSibilance.js';
 import * as speaker from './speaker.js';
 import * as police from './police.js';
 import * as echo from './echo.js';
@@ -13,11 +12,12 @@ import * as bassBoost from './bassBoost.js';
 import * as improveQuality from './improveQuality.js';
 import * as noiseReduction from './noiseReduction.js';
 import * as volume from './volume.js';
+import * as vocalRemoval from './vocalRemoval.js';
 
 const modules = [
-  femaleVoice, deepVoice, autotune, breathSibilance,
+  femaleVoice, deepVoice, autotune,
   speaker, police, echo, studio,
-  bassBoost, improveQuality, noiseReduction, volume
+  bassBoost, improveQuality, noiseReduction, vocalRemoval, volume
 ];
 
 export const effectsRegistry = {};
@@ -26,54 +26,17 @@ modules.forEach(mod => {
     meta: mod.meta,
     createNodes: mod.createNodes,
     processOfflineBuffer: mod.processOfflineBuffer || null,
-    getPitchConfig: mod.getPitchConfig || null,
+    // Autotune extras
     STYLE_PRESETS: mod.STYLE_PRESETS || null,
     detectKeyAndScale: mod.detectKeyAndScale || null,
     applyStylePreset: mod.applyStylePreset || null
   };
 });
 
-/**
- * Processing priority order (engine chain):
- * noise → breath/sib → vocal pitch character → autotune → tone → space → volume
- */
 export const effectOrder = [
-  'noiseReduction',
-  'breathSibilance',
-  'femaleVoice', 'deepVoice',
-  'autotune',
-  'bassBoost', 'improveQuality',
-  'speaker', 'police',
-  'echo', 'studio',
-  'volume'
-];
-
-export const effectCategories = [
-  {
-    id: 'voice',
-    label: 'صدا (Vocal)',
-    ids: ['femaleVoice', 'deepVoice']
-  },
-  {
-    id: 'correction',
-    label: 'تصحیح (Correction)',
-    ids: ['autotune', 'breathSibilance', 'noiseReduction']
-  },
-  {
-    id: 'tone',
-    label: 'تن (Tone)',
-    ids: ['bassBoost', 'improveQuality', 'volume']
-  },
-  {
-    id: 'space',
-    label: 'فضا (Space)',
-    ids: ['echo', 'studio']
-  },
-  {
-    id: 'character',
-    label: 'کاراکتر (Character)',
-    ids: ['speaker', 'police']
-  }
+  'femaleVoice', 'deepVoice', 'autotune',
+  'speaker', 'police', 'echo', 'studio',
+  'bassBoost', 'improveQuality', 'noiseReduction', 'vocalRemoval', 'volume'
 ];
 
 export function createEffectNodes(ctx, id, params) {

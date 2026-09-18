@@ -22,7 +22,7 @@ export function createNodes(ctx, params = {}) {
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -14;
   comp.knee.value = 3;
-  comp.ratio.value = 2.50 + intensity * 5;
+  comp.ratio.value = 5 + intensity * 5;
   comp.attack.value = 0.003;
   comp.release.value = 0.08;
 
@@ -36,15 +36,5 @@ export function createNodes(ctx, params = {}) {
   comp.connect(makeUp);
   makeUp.connect(output);
 
-  return {
-    input, output,
-    nodes: [input, hp, lp, mid, shaper, comp, makeUp, output],
-    update(p) {
-      const inten = p.intensity ?? intensity;
-      hp.frequency.setTargetAtTime(200 + inten * 100, ctx.currentTime, 0.04);
-      lp.frequency.setTargetAtTime(4200 - inten * 1400, ctx.currentTime, 0.04);
-      mid.gain.setTargetAtTime(5 + inten * 5, ctx.currentTime, 0.04);
-      comp.ratio.setTargetAtTime(5 + inten * 5, ctx.currentTime, 0.04);
-    }
-  };
+  return { input, output, nodes: [input, hp, lp, mid, shaper, comp, makeUp, output] };
 }
