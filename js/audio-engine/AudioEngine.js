@@ -1,5 +1,6 @@
 /**
- * AudioEngine V1.06 – seamless effect updates, duration-safe vocals
+ * AudioEngine – public facade for the entire audio subsystem.
+ * UI talks only to this class.
  */
 import { AudioContextManager } from './AudioContextManager.js';
 import { AudioLoader } from './AudioLoader.js';
@@ -7,13 +8,6 @@ import { AudioGraph } from './AudioGraph.js';
 import { AudioPlayer } from './AudioPlayer.js';
 import { AudioRenderer } from './AudioRenderer.js';
 import { AudioExporter } from './AudioExporter.js';
-import { effectsRegistry } from '../effects/index.js';
-
-const VOCAL_IDS = new Set(['femaleVoice', 'deepVoice']);
-const LIVE_ONLY = new Set([
-  'bassBoost', 'echo', 'volume', 'speaker', 'police',
-  'studio', 'improveQuality', 'noiseReduction', 'autotune'
-]);
 
 export class AudioEngine {
   constructor() {
@@ -25,292 +19,82 @@ export class AudioEngine {
     this.exporter = new AudioExporter();
 
     this.originalBuffer = null;
-    this.processedBuffer = null;
     this.meta = null;
-    this.effects = [];
+    this.effects = []; // [{id, params, enabled}]
     this.previewMode = 'processed';
-    this._lastVocalKey = null;
-    this._vocalBusy = false;
-    this.speed = 1;
-    // Track B (parallel dry mix)
-    this.trackB = { buffer: null, meta: null, gain: 1, mute: false, solo: false, source: null };
-    this.trackA = { gain: 1, mute: false, solo: false };
+    this.instrumentalBuffer = null;  // cached vocal-removed stem
+    this.vocalsBuffer = null;
+    this.separationMeta = null;
 
-
+    // proxy events
     this.player.onTimeUpdate = (t) => { if (this.onTimeUpdate) this.onTimeUpdate(t); };
     this.player.onEnded = () => { if (this.onEnded) this.onEnded(); };
     this.player.onStateChange = (s) => { if (this.onStateChange) this.onStateChange(s); };
   }
 
+  // ── Events (set by UI) ──
   onTimeUpdate = null;
   onEnded = null;
   onStateChange = null;
-  onVocalProgress = null; // (0..1, label)
 
+  // ── Load ──
   async loadFile(file) {
     this.stop();
     const { buffer, meta } = await this.loader.load(file);
-    this.originalBuffer = buffer; // immutable source – never mutate in place
-    this.processedBuffer = null;
-    this._lastVocalKey = null;
+    this.originalBuffer = buffer;
     this.meta = meta;
+    this.instrumentalBuffer = null;
+    this.vocalsBuffer = null;
+    this.separationMeta = null;
     this.player.setBuffer(buffer);
     this.effects = [];
     this.player.setEffects([]);
-    this.speed = 1;
-    // Track B (parallel dry mix)
-    this.trackB = { buffer: null, meta: null, gain: 1, mute: false, solo: false, source: null };
-    this.trackA = { gain: 1, mute: false, solo: false };
-
     return meta;
   }
 
-  _activeVocal() {
-    return this.effects.find(e => e.enabled && VOCAL_IDS.has(e.id)) || null;
-  }
-
-  _vocalKey(vocal) {
-    if (!vocal) return null;
-    return JSON.stringify({ id: vocal.id, params: vocal.params });
-  }
-
-  /**
-   * Duration-preserving vocal pitch. Yields to UI every chunk.
-   */
-  async _ensureProcessedBuffer() {
-    const vocal = this._activeVocal();
-    if (!vocal || this.previewMode === 'original') {
-      this.processedBuffer = null;
-      this._lastVocalKey = null;
-      return this.originalBuffer;
-    }
-
-    const key = this._vocalKey(vocal);
-    if (key === this._lastVocalKey && this.processedBuffer) {
-      return this.processedBuffer;
-    }
-
-    this._vocalBusy = true;
-    try {
-      if (this.onVocalProgress) this.onVocalProgress(0.05, 'پردازش Pitch...');
-      const entry = effectsRegistry[vocal.id];
-      if (entry?.processOfflineBuffer) {
-        // Yield once so UI can paint
-        await new Promise(r => setTimeout(r, 0));
-        this.processedBuffer = await entry.processOfflineBuffer(
-          this.originalBuffer,
-          vocal.params,
-          (p) => {
-            if (this.onVocalProgress) this.onVocalProgress(0.05 + p * 0.9, 'پردازش Pitch...');
-          }
-        );
-        this._lastVocalKey = key;
-      } else {
-        this.processedBuffer = this.originalBuffer;
-        this._lastVocalKey = key;
-      }
-      if (this.onVocalProgress) this.onVocalProgress(1, 'آماده');
-    } finally {
-      this._vocalBusy = false;
-    }
-    return this.processedBuffer || this.originalBuffer;
-  }
-
-  /**
-   * Smart effect update:
-   * - Live param changes → no pause
-   * - Live effect toggle → seamless rebuild at same position
-   * - Vocal toggle → process in background, then switch without dropping play state aggressively
-   */
-  async setEffects(list) {
-    const prev = this.effects;
+  // ── Effects ──
+  setEffects(list) {
     this.effects = list.map(e => ({
       id: e.id,
       params: { ...e.params },
       enabled: !!e.enabled
     }));
     this.player.setEffects(this.effects);
-
-    const prevVocal = prev.find(e => e.enabled && VOCAL_IDS.has(e.id));
-    const nextVocal = this._activeVocal();
-    const vocalChanged =
-      (prevVocal?.id !== nextVocal?.id) ||
-      (prevVocal && nextVocal && this._vocalKey(prevVocal) !== this._vocalKey(nextVocal));
-
-    const wasPlaying = this.player.isPlaying;
-    const t = this.player.currentTime;
-
-    if (vocalChanged) {
-      // Heavy path – process first, then one rebuild
-      const buf = await this._ensureProcessedBuffer();
-      this.player.setBuffer(buf);
-      if (wasPlaying) {
-        await this.player.play(t); // single restart at same position
-      }
-      return;
-    }
-
-    // No vocal change – ensure correct base buffer
-    if (!nextVocal) {
-      this.processedBuffer = null;
-      this._lastVocalKey = null;
-      if (this.player.buffer !== this.originalBuffer) {
-        this.player.setBuffer(this.originalBuffer);
-      }
-    }
-
-    // Graph structure change (enable/disable live effects) – one rebuild only
-    if (wasPlaying) {
-      await this.player.rebuild();
+    if (this.player.isPlaying) {
+      this.player.rebuild();
     }
   }
 
-  async updateEffectParams(id, params) {
+  updateEffectParams(id, params) {
     const e = this.effects.find(x => x.id === id);
     if (!e) return;
     Object.assign(e.params, params);
     this.player.setEffects(this.effects);
 
-    const isVocal = VOCAL_IDS.has(id);
-    if (isVocal && e.enabled && (params.intensity !== undefined || params.mode !== undefined)) {
-      // Debounced heavy path handled by UI; here process + seamless switch
-      this._lastVocalKey = null;
-      const wasPlaying = this.player.isPlaying;
-      const t = this.player.currentTime;
-      const buf = await this._ensureProcessedBuffer();
-      this.player.setBuffer(buf);
-      if (wasPlaying) await this.player.play(t);
-      return;
-    }
-
-    // Live AudioParam – no pause
+    // 1) Prefer live AudioParam update (no audible gap)
     const live = this.graph.updateParams(id, params);
     if (live) return;
 
-    // Fallback rebuild only if needed
+    // 2) Effect needs structural rebuild (e.g. pitchFactor) while playing
     if (this.player.isPlaying) {
-      await this.player.rebuild();
+      this.player.rebuild();
     }
   }
 
+  // ── Playback ──
   async play(offset) {
+    // Ensure context is running (Chrome autoplay)
     await this.ctxManager.ensure();
     this.player.setMode(this.previewMode);
-    if (this.previewMode === 'processed') {
-      const buf = await this._ensureProcessedBuffer();
-      this.player.setBuffer(buf);
-    } else {
-      this.player.setBuffer(this.originalBuffer);
-    }
     this.player.setEffects(this.effects);
-    this.player.setSpeed?.(this.speed);
     await this.player.play(offset);
-    this._startTrackB(offset ?? this.player.currentTime);
   }
 
-  async loadTrackB(file) {
-    const { buffer, meta } = await this.loader.load(file);
-    this.trackB.buffer = buffer;
-    this.trackB.meta = meta;
-    if (this.player.isPlaying) this._startTrackB(this.player.currentTime);
-    return meta;
-  }
+  pause() { this.player.pause(); }
 
-  clearTrackB() {
-    this._stopTrackB();
-    this.trackB.buffer = null;
-    this.trackB.meta = null;
-  }
+  stop(reset = true) { this.player.stop(reset); }
 
-  setTrackGain(track, linear) {
-    const g = Math.max(0, Math.min(1.5, linear));
-    if (track === 'A') {
-      this.trackA.gain = g;
-      if (this.graph.masterGain) {
-        // masterGain used for A path; apply relative
-        const soloB = this.trackB.solo && !this.trackA.solo;
-        const mute = this.trackA.mute || soloB;
-        this.graph.masterGain.gain.setTargetAtTime(mute ? 0 : g, this.ctxManager.currentTime, 0.03);
-      }
-    } else {
-      this.trackB.gain = g;
-      if (this.trackB._gainNode) {
-        const soloA = this.trackA.solo && !this.trackB.solo;
-        const mute = this.trackB.mute || soloA;
-        this.trackB._gainNode.gain.setTargetAtTime(mute ? 0 : g, this.ctxManager.currentTime, 0.03);
-      }
-    }
-  }
-
-  setTrackMute(track, muted) {
-    if (track === 'A') this.trackA.mute = !!muted;
-    else this.trackB.mute = !!muted;
-    this.setTrackGain('A', this.trackA.gain);
-    this.setTrackGain('B', this.trackB.gain);
-  }
-
-  setTrackSolo(track, solo) {
-    if (track === 'A') this.trackA.solo = !!solo;
-    else this.trackB.solo = !!solo;
-    this.setTrackGain('A', this.trackA.gain);
-    this.setTrackGain('B', this.trackB.gain);
-  }
-
-  _startTrackB(offset = 0) {
-    this._stopTrackB();
-    if (!this.trackB.buffer || !this.ctxManager.get()) return;
-    const ctx = this.ctxManager.get();
-    const src = ctx.createBufferSource();
-    src.buffer = this.trackB.buffer;
-    src.playbackRate.value = this.speed || 1;
-    const g = ctx.createGain();
-    const soloA = this.trackA.solo && !this.trackB.solo;
-    const mute = this.trackB.mute || soloA;
-    g.gain.value = mute ? 0 : this.trackB.gain;
-    src.connect(g);
-    // Mix into destination via analyser if available
-    if (this.graph.analyser) g.connect(this.graph.analyser);
-    else g.connect(ctx.destination);
-    try {
-      src.start(0, Math.max(0, offset));
-    } catch (e) {
-      console.warn('[TrackB] start', e);
-      return;
-    }
-    this.trackB.source = src;
-    this.trackB._gainNode = g;
-  }
-
-  _stopTrackB() {
-    if (this.trackB.source) {
-      try { this.trackB.source.stop(); } catch (_) {}
-      try { this.trackB.source.disconnect(); } catch (_) {}
-      this.trackB.source = null;
-    }
-    if (this.trackB._gainNode) {
-      try { this.trackB._gainNode.disconnect(); } catch (_) {}
-      this.trackB._gainNode = null;
-    }
-  }
-
-
-  pause() { this.player.pause(); this._stopTrackB(); }
-  stop(reset = true) { this.player.stop(reset); this._stopTrackB(); }
   seek(t) { this.player.seek(t); }
-
-  setSpeed(rate) {
-    this.speed = Math.max(0.5, Math.min(2, rate || 1));
-    if (this.player.setSpeed) this.player.setSpeed(this.speed);
-    else if (this.graph.source) {
-      try {
-        this.graph.source.playbackRate.setTargetAtTime(
-          (this.graph.playbackRate || 1) * this.speed,
-          this.ctxManager.currentTime,
-          0.05
-        );
-      } catch (_) {}
-    }
-  }
 
   setPreviewMode(mode) {
     this.previewMode = mode;
@@ -320,13 +104,60 @@ export class AudioEngine {
 
   get isPlaying() { return this.player.isPlaying; }
   get currentTime() { return this.player.currentTime; }
-  get duration() {
-    return this.originalBuffer ? this.originalBuffer.duration : 0;
-  }
+  get duration() { return this.player.duration; }
 
   getAnalyserTimeData() { return this.graph.getAnalyserTimeData(); }
   getAnalyserFreqData() { return this.graph.getAnalyserFreqData(); }
 
+
+  /**
+   * Run vocal separation offline and cache instrumental for preview A/B.
+   * Original buffer is never modified.
+   */
+  async processVocalRemoval(params, onProgress) {
+    if (!this.originalBuffer) throw new Error('NO_BUFFER');
+    const entry = (await import('../effects/index.js')).effectsRegistry.vocalRemoval;
+    if (!entry?.processOfflineBuffer) throw new Error('NO_VR');
+    const result = await entry.processOfflineBuffer(
+      this.originalBuffer,
+      params || {},
+      onProgress
+    );
+    this.instrumentalBuffer = result;
+    this.vocalsBuffer = result._vocalsBuffer || null;
+    this.separationMeta = result._separationMeta || null;
+    return {
+      confidence: this.separationMeta?.confidence ?? 0,
+      method: this.separationMeta?.method ?? 'stft',
+      hasVocalsStem: !!this.vocalsBuffer
+    };
+  }
+
+  /**
+   * Switch playback source: 'original' | 'instrumental' | 'vocals'
+   * Used for A/B after separation. Keeps originalBuffer intact.
+   */
+  setPlaybackSource(which) {
+    let buf = this.originalBuffer;
+    if (which === 'instrumental' && this.instrumentalBuffer) buf = this.instrumentalBuffer;
+    else if (which === 'vocals' && this.vocalsBuffer) buf = this.vocalsBuffer;
+    if (!buf) return false;
+    const wasPlaying = this.player.isPlaying;
+    const t = this.player.currentTime;
+    this.player.setBuffer(buf);
+    // Restore duration-related UI via player buffer; effects still apply on top
+    if (wasPlaying) this.player.play(Math.min(t, buf.duration));
+    return true;
+  }
+
+  clearVocalSeparation() {
+    this.instrumentalBuffer = null;
+    this.vocalsBuffer = null;
+    this.separationMeta = null;
+    if (this.originalBuffer) this.player.setBuffer(this.originalBuffer);
+  }
+
+  // ── Export ──
   async export(options, onProgress) {
     if (!this.originalBuffer) throw new Error('NO_BUFFER');
     const rendered = await this.renderer.render(
@@ -341,17 +172,10 @@ export class AudioEngine {
   reset() {
     this.stop(true);
     this.effects = [];
-    this.processedBuffer = null;
-    this._lastVocalKey = null;
     this.player.setEffects([]);
-    this.player.setBuffer(this.originalBuffer);
     this.previewMode = 'processed';
     this.player.setMode('processed');
-    this.speed = 1;
-    // Track B (parallel dry mix)
-    this.trackB = { buffer: null, meta: null, gain: 1, mute: false, solo: false, source: null };
-    this.trackA = { gain: 1, mute: false, solo: false };
-
+    this.clearVocalSeparation();
   }
 
   async dispose() {
@@ -359,11 +183,12 @@ export class AudioEngine {
     this.graph.disconnect();
     await this.ctxManager.close();
     this.originalBuffer = null;
-    this.processedBuffer = null;
     this.meta = null;
   }
 
+  /** Diagnostics for development */
   getDiagnostics() {
+    const chain = this.graph.chain || [];
     return {
       contextState: this.ctxManager.state,
       sampleRate: this.ctxManager.sampleRate,
@@ -372,11 +197,13 @@ export class AudioEngine {
       currentTime: this.currentTime,
       isPlaying: this.isPlaying,
       activeEffects: this.effects.filter(e => e.enabled).map(e => e.id),
-      graphChain: (this.graph.chain || []).map(c => c.id),
+      graphChain: chain.map(c => c.id),
+      sourceConnected: !!this.graph.source,
+      masterGain: !!this.graph.masterGain,
+      analyser: !!this.graph.analyser,
       playbackRate: this.graph.playbackRate || 1,
-      speed: this.speed,
-      vocalProcessed: !!this.processedBuffer,
-      vocalBusy: this._vocalBusy,
+      previewMode: this.previewMode,
+      bufferSampleRate: this.originalBuffer?.sampleRate ?? 0,
       signalPath: this._describeSignalPath()
     };
   }
@@ -384,8 +211,11 @@ export class AudioEngine {
   _describeSignalPath() {
     const parts = ['Source'];
     const enabled = this.effects.filter(e => e.enabled);
-    if (this.previewMode === 'original' || enabled.length === 0) parts.push('(bypass)');
-    else enabled.forEach(e => parts.push(e.id));
+    if (this.previewMode === 'original' || enabled.length === 0) {
+      parts.push('(bypass)');
+    } else {
+      enabled.forEach(e => parts.push(e.id));
+    }
     parts.push('MasterGain', 'Analyser', 'Destination');
     return parts.join(' → ');
   }

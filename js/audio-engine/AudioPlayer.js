@@ -19,7 +19,6 @@ export class AudioPlayer {
     this.pauseOffset = 0;       // position in source buffer
     this.startCtxTime = 0;      // ctx.currentTime when started
     this.rate = 1;
-    this.speed = 1; // user playback speed (independent of pitch)
     this._endedHandler = null;
     this._raf = null;
     this._seeking = false;
@@ -55,23 +54,6 @@ export class AudioPlayer {
     return clamp(this.pauseOffset + elapsed * this.rate, 0, this.duration);
   }
 
-  setSpeed(s) {
-    this.speed = Math.max(0.5, Math.min(2, s || 1));
-    if (this.isPlaying && this.graph.source) {
-      try {
-        // Anchor timeline so rate change does not jump or false-end
-        const pos = this.currentTime;
-        this.pauseOffset = pos;
-        this.startCtxTime = this.ctxManager.currentTime;
-        const base = this.graph.playbackRate || 1;
-        const next = base * this.speed;
-        this.graph.source.playbackRate.cancelScheduledValues(this.ctxManager.currentTime);
-        this.graph.source.playbackRate.setValueAtTime(next, this.ctxManager.currentTime);
-        this.rate = next;
-      } catch (_) {}
-    }
-  }
-
   async play(fromOffset = null) {
     if (!this.buffer) return;
 
@@ -92,9 +74,8 @@ export class AudioPlayer {
       return;
     }
 
-    this.rate = built.playbackRate * (this.speed || 1);
+    this.rate = built.playbackRate;
     const source = built.source;
-    source.playbackRate.value = this.rate;
 
     const remaining = (this.duration - offset) / this.rate;
 
@@ -110,10 +91,11 @@ export class AudioPlayer {
     source.onended = this._endedHandler;
 
     try {
-      // Do NOT schedule source.stop() ahead of time.
-      // A pre-scheduled stop becomes wrong when playbackRate/speed changes
-      // and causes a sudden mid-track pause. Natural buffer end + onended + RAF is enough.
       source.start(0, offset);
+      // Safety stop so onended fires even with rate changes
+      if (remaining > 0.05 && isFinite(remaining)) {
+        source.stop(this.ctxManager.currentTime + remaining + 0.08);
+      }
     } catch (err) {
       console.error('[AudioPlayer] start error', err);
       this.isPlaying = false;
@@ -180,7 +162,7 @@ export class AudioPlayer {
     const tick = () => {
       if (!this.isPlaying) return;
       const t = this.currentTime;
-      if (t >= this.duration - 0.02) {
+      if (t >= this.duration - 0.03) {
         this.isPlaying = false;
         this.pauseOffset = 0;
         this._stopRaf();
