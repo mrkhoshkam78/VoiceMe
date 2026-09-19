@@ -1,6 +1,6 @@
 /**
- * Male / Deep Voice – Independent Pitch + Formant (duration preserved)
- * Natural male body, not cartoon "deep".
+ * Male / Deep Voice – V2.5.2 Pro
+ * Independent Pitch + Formant (duration preserved). Natural male body.
  */
 import { createGain, createBiquad } from './baseEffect.js';
 import { VOCAL_PRESETS } from '../audio-engine/PitchProcessor.js';
@@ -11,13 +11,13 @@ export const meta = {
   description: 'صدای مردانه‌تر و پرتر؛ بدون تغییر سرعت یا مدت فایل',
   icon: 'deep',
   category: 'voice',
-  defaultParams: { intensity: 0.75 },
+  defaultParams: { intensity: 0.7 },
   requiresPitchProcess: true,
   pitchProcessKey: 'deepVoice'
 };
 
 export function getPitchConfig(params = {}) {
-  const intensity = Math.max(0, Math.min(1, params.intensity ?? 0.75));
+  const intensity = Math.max(0, Math.min(1, params.intensity ?? 0.7));
   const preset = VOCAL_PRESETS.male;
 
   const pitchRatio = 1 + (preset.pitchRatio - 1) * intensity;
@@ -28,10 +28,11 @@ export function getPitchConfig(params = {}) {
     formantShift,
     intensity,
     eq: {
-      lowShelf: (preset.lowShelf || 4) * intensity,
-      presence: preset.presence * intensity,
-      highShelf: (preset.highShelf || -1.5) * intensity,
-      lowCut: preset.lowCut
+      lowShelf: (preset.lowShelf || 3) * intensity,
+      presence: (preset.presence || 1) * intensity,
+      highShelf: (preset.highShelf || -0.8) * intensity,
+      lowCut: preset.lowCut || 50,
+      body: (preset.body || 2) * intensity
     }
   };
 }
@@ -41,19 +42,20 @@ export function createNodes(ctx, params = {}) {
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
-  const lowShelf = createBiquad(ctx, 'lowshelf', 180, 1, cfg.eq.lowShelf || 3);
-  const mid = createBiquad(ctx, 'peaking', 420, 1.0, 1.5 + cfg.intensity * 2);
-  const highpass = createBiquad(ctx, 'highpass', cfg.eq.lowCut || 60, 0.7);
-  const highShelf = createBiquad(ctx, 'highshelf', 6000, 1, cfg.eq.highShelf || -1);
+  const highpass = createBiquad(ctx, 'highpass', cfg.eq.lowCut || 50, 0.7);
+  const lowShelf = createBiquad(ctx, 'lowshelf', 160, 0.9, Math.min(4, cfg.eq.lowShelf || 2.5));
+  // Chest / body – not muddy
+  const mid = createBiquad(ctx, 'peaking', 380, 0.95, 1.0 + cfg.intensity * 1.5);
+  const highShelf = createBiquad(ctx, 'highshelf', 6500, 0.9, cfg.eq.highShelf || -0.8);
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -18;
-  comp.knee.value = 10;
-  comp.ratio.value = 2.2;
-  comp.attack.value = 0.015;
-  comp.release.value = 0.2;
+  comp.threshold.value = -17;
+  comp.knee.value = 12;
+  comp.ratio.value = 2.0;
+  comp.attack.value = 0.014;
+  comp.release.value = 0.22;
 
-  const makeUp = createGain(ctx, 1 + cfg.intensity * 0.12);
+  const makeUp = createGain(ctx, 1 + cfg.intensity * 0.08);
 
   input.connect(highpass);
   highpass.connect(lowShelf);
@@ -69,10 +71,11 @@ export function createNodes(ctx, params = {}) {
     pitchFactor: 1,
     update(p) {
       const c = getPitchConfig(p);
-      lowShelf.gain.setTargetAtTime(c.eq.lowShelf || 3, ctx.currentTime, 0.04);
-      mid.gain.setTargetAtTime(1.5 + c.intensity * 2, ctx.currentTime, 0.04);
-      highShelf.gain.setTargetAtTime(c.eq.highShelf || -1, ctx.currentTime, 0.04);
-      makeUp.gain.setTargetAtTime(1 + c.intensity * 0.12, ctx.currentTime, 0.04);
+      const t = ctx.currentTime;
+      lowShelf.gain.setTargetAtTime(Math.min(4, c.eq.lowShelf || 2.5), t, 0.04);
+      mid.gain.setTargetAtTime(1.0 + c.intensity * 1.5, t, 0.04);
+      highShelf.gain.setTargetAtTime(c.eq.highShelf || -0.8, t, 0.04);
+      makeUp.gain.setTargetAtTime(1 + c.intensity * 0.08, t, 0.04);
     }
   };
 }

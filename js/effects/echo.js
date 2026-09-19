@@ -1,7 +1,7 @@
 /**
- * Echo / Delay – V2.4.4
- * Feedback hard-capped, filtered feedback path, mix control.
- * Units: delay (s), feedback (0–0.75), mix (0–1)
+ * Echo / Delay – V2.5.2 Pro
+ * Filtered feedback, musical defaults, soft high-damp on repeats.
+ * Units: delay (s), feedback (0–0.72), mix (0–1)
  */
 import { createGain, createBiquad } from './baseEffect.js';
 
@@ -11,11 +11,11 @@ export const meta = {
   description: 'تأخیر کنترل‌شده با فیلتر و سقف Feedback',
   icon: 'echo',
   category: 'space',
-  defaultParams: { delay: 0.28, feedback: 0.32, mix: 0.35 },
+  defaultParams: { delay: 0.32, feedback: 0.28, mix: 0.28 },
   paramUnits: { delay: 's', feedback: 'ratio', mix: 'ratio' },
   paramRanges: {
     delay: [0.05, 0.9],
-    feedback: [0, 0.75],
+    feedback: [0, 0.72],
     mix: [0, 1]
   }
 };
@@ -25,9 +25,9 @@ function clamp(v, lo, hi) {
 }
 
 export function createNodes(ctx, params = {}) {
-  let delayTime = clamp(params.delay ?? 0.28, 0.05, 0.9);
-  let feedbackAmt = clamp(params.feedback ?? 0.32, 0, 0.75);
-  let mix = clamp(params.mix ?? 0.35, 0, 1);
+  let delayTime = clamp(params.delay ?? 0.32, 0.05, 0.9);
+  let feedbackAmt = clamp(params.feedback ?? 0.28, 0, 0.72);
+  let mix = clamp(params.mix ?? 0.28, 0, 1);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
@@ -38,9 +38,11 @@ export function createNodes(ctx, params = {}) {
   delayNode.delayTime.value = delayTime;
 
   const feedback = createGain(ctx, feedbackAmt);
-  // Filter feedback loop – prevent harsh buildup
-  const fbHp = createBiquad(ctx, 'highpass', 120, 0.7);
-  const fbLp = createBiquad(ctx, 'lowpass', 5500, 0.7);
+  // Filter feedback loop – prevent harsh buildup (classic analog delay tone)
+  const fbHp = createBiquad(ctx, 'highpass', 100, 0.7);
+  const fbLp = createBiquad(ctx, 'lowpass', 4800, 0.7);
+  // Mild damping on wet path for darker, more musical repeats
+  const wetLp = createBiquad(ctx, 'lowpass', 6200, 0.7);
 
   input.connect(dry);
   dry.connect(output);
@@ -49,18 +51,19 @@ export function createNodes(ctx, params = {}) {
   delayNode.connect(fbHp);
   fbHp.connect(fbLp);
   fbLp.connect(feedback);
-  feedback.connect(delayNode); // feedback loop
+  feedback.connect(delayNode);
 
-  delayNode.connect(wet);
+  delayNode.connect(wetLp);
+  wetLp.connect(wet);
   wet.connect(output);
 
   return {
     input, output,
-    nodes: [input, dry, wet, delayNode, feedback, fbHp, fbLp, output],
+    nodes: [input, dry, wet, delayNode, feedback, fbHp, fbLp, wetLp, output],
     update(p) {
       const t = ctx.currentTime;
       delayTime = clamp(p.delay ?? delayTime, 0.05, 0.9);
-      feedbackAmt = clamp(p.feedback ?? feedbackAmt, 0, 0.75);
+      feedbackAmt = clamp(p.feedback ?? feedbackAmt, 0, 0.72);
       mix = clamp(p.mix ?? mix, 0, 1);
       delayNode.delayTime.setTargetAtTime(delayTime, t, 0.05);
       feedback.gain.setTargetAtTime(feedbackAmt, t, 0.05);

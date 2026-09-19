@@ -1,3 +1,7 @@
+/**
+ * Police / Radio character – V2.5.2 Pro
+ * Narrow band + peak + saturation for radio / walkie feel
+ */
 import { createGain, createBiquad, createShaper } from './baseEffect.js';
 
 export const meta = {
@@ -6,28 +10,28 @@ export const meta = {
   description: 'افکت رادیو و بلندگوی پلیس',
   icon: 'police',
   category: 'environment',
-  defaultParams: { intensity: 0.8 }
+  defaultParams: { intensity: 0.75 }
 };
 
 export function createNodes(ctx, params = {}) {
-  const intensity = params.intensity ?? 0.8;
+  const intensity = params.intensity ?? 0.75;
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
-  const hp = createBiquad(ctx, 'highpass', 450 + intensity * 250, 1.0);
-  const lp = createBiquad(ctx, 'lowpass', 2600 - intensity * 500, 1.0);
-  const peak = createBiquad(ctx, 'peaking', 1350, 2.8, 8 + intensity * 5);
-  const shaper = createShaper(ctx, 25 + intensity * 55);
+  const hp = createBiquad(ctx, 'highpass', 420 + intensity * 220, 1.0);
+  const lp = createBiquad(ctx, 'lowpass', 2700 - intensity * 450, 1.0);
+  const peak = createBiquad(ctx, 'peaking', 1300, 2.5, 7 + intensity * 4);
+  const shaper = createShaper(ctx, 20 + intensity * 45);
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -10;
+  comp.threshold.value = -11;
   comp.knee.value = 2;
-  comp.ratio.value = 2.50;
+  comp.ratio.value = 6;
   comp.attack.value = 0.001;
   comp.release.value = 0.06;
 
-  const hs = createBiquad(ctx, 'highshelf', 1800, 1, 3 + intensity * 4);
-  const makeUp = createGain(ctx, 0.9);
+  const hs = createBiquad(ctx, 'highshelf', 1900, 1, 2.5 + intensity * 3);
+  const makeUp = createGain(ctx, 0.88);
 
   input.connect(hp);
   hp.connect(lp);
@@ -43,10 +47,11 @@ export function createNodes(ctx, params = {}) {
     nodes: [input, hp, lp, peak, shaper, hs, comp, makeUp, output],
     update(p) {
       const inten = p.intensity ?? intensity;
-      hp.frequency.setTargetAtTime(450 + inten * 250, ctx.currentTime, 0.04);
-      lp.frequency.setTargetAtTime(2600 - inten * 500, ctx.currentTime, 0.04);
-      peak.gain.setTargetAtTime(8 + inten * 5, ctx.currentTime, 0.04);
-      hs.gain.setTargetAtTime(3 + inten * 4, ctx.currentTime, 0.04);
+      const t = ctx.currentTime;
+      hp.frequency.setTargetAtTime(420 + inten * 220, t, 0.04);
+      lp.frequency.setTargetAtTime(2700 - inten * 450, t, 0.04);
+      peak.gain.setTargetAtTime(7 + inten * 4, t, 0.04);
+      hs.gain.setTargetAtTime(2.5 + inten * 3, t, 0.04);
     }
   };
 }

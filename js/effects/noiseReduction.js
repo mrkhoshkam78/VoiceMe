@@ -1,10 +1,8 @@
 /**
- * Noise Reduction – lightweight spectral-ish approach using
- * high-pass + adaptive low-level gating approximation via expansion-like dynamics
- * and mild high-frequency noise shelf cut.
- *
- * Not a full spectral subtraction engine (that needs FFT frames + noise profile),
- * but produces clearly audible noise reduction without robotic artifacts.
+ * Noise Reduction – V2.5.2 Pro
+ * Live: HPF + hiss shelf + mild mid cleanup + soft dynamics
+ * Offline: energy-based noise floor estimate + smooth attenuation
+ * Conservative to avoid underwater / robotic artifacts.
  */
 import { createGain, createBiquad } from './baseEffect.js';
 import { clamp } from '../utils/helpers.js';
@@ -16,9 +14,9 @@ export const meta = {
   icon: 'noise',
   category: 'enhancement',
   defaultParams: {
-    strength: 0.5,
-    sensitivity: 0.45,
-    intensity: 0.65
+    strength: 0.45,
+    sensitivity: 0.4,
+    intensity: 0.6
   },
   paramUnits: { strength: 'ratio', sensitivity: 'ratio', intensity: 'ratio' },
   paramRanges: {
@@ -31,36 +29,32 @@ export const meta = {
 function clamp01(v) { return Math.max(0, Math.min(1, Number(v) || 0)); }
 
 export function createNodes(ctx, params = {}) {
-  let strength = clamp01(params.strength ?? 0.5) * clamp01(params.intensity ?? 0.65);
-  let sensitivity = clamp01(params.sensitivity ?? 0.45);
+  let strength = clamp01(params.strength ?? 0.45) * clamp01(params.intensity ?? 0.6);
+  let sensitivity = clamp01(params.sensitivity ?? 0.4);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
   // Remove rumble / low hum
-  const hp = createBiquad(ctx, 'highpass', 40 + sensitivity * 60, 0.7);
+  const hp = createBiquad(ctx, 'highpass', 35 + sensitivity * 45, 0.7);
 
-  // Cut hiss region proportionally
-  const hissCut = createBiquad(ctx, 'highshelf', 6000 + sensitivity * 2000, 1, -3 - strength * 9);
+  // Cut hiss region proportionally – milder than before
+  const hissCut = createBiquad(ctx, 'highshelf', 7000 + sensitivity * 1500, 0.9, -2 - strength * 6);
 
-  // Mild mid noise cleanup
-  const midNotch = createBiquad(ctx, 'peaking', 2500, 1.5, -1 - strength * 2);
+  // Mild mid noise cleanup (not a deep notch)
+  const midNotch = createBiquad(ctx, 'peaking', 2400, 1.2, -0.6 - strength * 1.4);
 
-  // Expander-like: high ratio above a low threshold reduces quiet noise floor
-  // DynamicsCompressor with high threshold acts as downward expander approximation
-  // when combined with makeup – we use a parallel dry/wet soft-gate feel
   const gate = ctx.createDynamicsCompressor();
-  gate.threshold.value = -50 + sensitivity * 20; // more sensitive = higher threshold for noise
-  gate.knee.value = 20;
-  gate.ratio.value = 1.5 + strength * 4;
-  gate.attack.value = 0.005;
-  gate.release.value = 0.15 + (1 - strength) * 0.2;
+  gate.threshold.value = -48 + sensitivity * 16;
+  gate.knee.value = 24;
+  gate.ratio.value = 1.3 + strength * 2.5;
+  gate.attack.value = 0.008;
+  gate.release.value = 0.18 + (1 - strength) * 0.15;
 
-  const makeUp = createGain(ctx, 1 + strength * 0.08);
+  const makeUp = createGain(ctx, 1 + strength * 0.05);
 
-  // Wet/dry based on strength
-  const dry = createGain(ctx, 1 - strength * 0.7);
-  const wet = createGain(ctx, strength * 0.7 + 0.15);
+  const dry = createGain(ctx, 1 - strength * 0.55);
+  const wet = createGain(ctx, strength * 0.55 + 0.2);
 
   input.connect(dry);
   dry.connect(output);
@@ -77,21 +71,31 @@ export function createNodes(ctx, params = {}) {
     input, output,
     nodes: [input, dry, wet, hp, hissCut, midNotch, gate, makeUp, output],
     update(p) {
-      const s = (p.strength ?? strength) * (p.intensity ?? 1);
-      dry.gain.setTargetAtTime(1 - s * 0.7, ctx.currentTime, 0.05);
-      wet.gain.setTargetAtTime(s * 0.7 + 0.15, ctx.currentTime, 0.05);
-      hissCut.gain.setTargetAtTime(-3 - s * 9, ctx.currentTime, 0.05);
+      const s = clamp01(p.strength ?? 0.45) * clamp01(p.intensity ?? 0.6);
+      const sens = clamp01(p.sensitivity ?? sensitivity);
+      strength = s;
+      sensitivity = sens;
+      const t = ctx.currentTime;
+      dry.gain.setTargetAtTime(1 - s * 0.55, t, 0.05);
+      wet.gain.setTargetAtTime(s * 0.55 + 0.2, t, 0.05);
+      hissCut.gain.setTargetAtTime(-2 - s * 6, t, 0.05);
+      hissCut.frequency.setTargetAtTime(7000 + sens * 1500, t, 0.05);
+      midNotch.gain.setTargetAtTime(-0.6 - s * 1.4, t, 0.05);
+      hp.frequency.setTargetAtTime(35 + sens * 45, t, 0.05);
+      gate.threshold.setTargetAtTime(-48 + sens * 16, t, 0.05);
+      gate.ratio.setTargetAtTime(1.3 + s * 2.5, t, 0.05);
+      makeUp.gain.setTargetAtTime(1 + s * 0.05, t, 0.05);
     }
   };
 }
 
 /**
- * Offline: spectral-ish noise gate per frame (simple energy-based)
+ * Offline: energy-based noise reduction with smooth fades (less choppy)
  */
 export async function processOfflineBuffer(audioBuffer, params = {}, onProgress) {
-  const strength = (params.strength ?? 0.55) * (params.intensity ?? 0.7);
-  const sensitivity = params.sensitivity ?? 0.5;
-  if (strength < 0.05) return audioBuffer;
+  const strength = clamp01(params.strength ?? 0.45) * clamp01(params.intensity ?? 0.6);
+  const sensitivity = clamp01(params.sensitivity ?? 0.4);
+  if (strength < 0.04) return audioBuffer;
 
   const sr = audioBuffer.sampleRate;
   const channels = audioBuffer.numberOfChannels;
@@ -99,7 +103,6 @@ export async function processOfflineBuffer(audioBuffer, params = {}, onProgress)
   const frameSize = 1024;
   const hop = 512;
 
-  // Estimate noise floor from quietest 10% of frames (mono mix energy)
   const mono = new Float32Array(length);
   for (let c = 0; c < channels; c++) {
     const d = audioBuffer.getChannelData(c);
@@ -113,33 +116,40 @@ export async function processOfflineBuffer(audioBuffer, params = {}, onProgress)
     energies.push({ i, e: Math.sqrt(e / frameSize) });
   }
   energies.sort((a, b) => a.e - b.e);
-  const noiseFloor = energies[Math.floor(energies.length * 0.1)]?.e || 0.01;
-  const threshold = noiseFloor * (1.5 + sensitivity * 3);
+  const noiseFloor = energies[Math.floor(energies.length * 0.08)]?.e || 0.008;
+  const threshold = noiseFloor * (1.8 + sensitivity * 2.5);
 
-  if (onProgress) onProgress(0.3);
+  if (onProgress) onProgress(0.25);
 
+  // Rebuild energy order by position for smooth application
+  const byPos = [...energies].sort((a, b) => a.i - b.i);
   const outBuf = new AudioBuffer({ length, numberOfChannels: channels, sampleRate: sr });
+
   for (let c = 0; c < channels; c++) {
     const src = audioBuffer.getChannelData(c);
     const dst = outBuf.getChannelData(c);
     dst.set(src);
 
-    for (let f = 0; f < energies.length; f++) {
-      const start = energies[f].i;
-      // recompute energy for this channel
+    for (let f = 0; f < byPos.length; f++) {
+      const start = byPos[f].i;
       let e = 0;
       for (let j = 0; j < frameSize && start + j < length; j++) {
         e += src[start + j] * src[start + j];
       }
       e = Math.sqrt(e / frameSize);
       if (e < threshold) {
-        const atten = clamp(1 - strength * (1 - e / threshold), 0.15, 1);
+        // Soft knee attenuation
+        const ratio = e / (threshold + 1e-10);
+        const atten = clamp(1 - strength * (1 - ratio) * 0.9, 0.2, 1);
+        // Fade across hop to avoid clicks
         for (let j = 0; j < hop && start + j < length; j++) {
-          dst[start + j] *= atten;
+          const fade = j < 64 ? j / 64 : (j > hop - 64 ? (hop - j) / 64 : 1);
+          const a = 1 - (1 - atten) * fade;
+          dst[start + j] *= a;
         }
       }
     }
-    if (onProgress) onProgress(0.3 + 0.7 * ((c + 1) / channels));
+    if (onProgress) onProgress(0.25 + 0.7 * ((c + 1) / channels));
   }
   return outBuf;
 }

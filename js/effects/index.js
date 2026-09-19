@@ -36,9 +36,10 @@ modules.forEach(mod => {
 
 /**
  * Processing priority order (engine chain):
- * noise → breath/sib → vocal pitch character → autotune → tone → space → volume
+ * vocalRemoval (offline first) → noise → breath/sib → vocal pitch → autotune → tone → space → volume
  */
 export const effectOrder = [
+  'vocalRemoval',
   'noiseReduction',
   'breathSibilance',
   'femaleVoice', 'deepVoice',
@@ -46,7 +47,6 @@ export const effectOrder = [
   'bassBoost', 'improveQuality',
   'speaker', 'police',
   'echo', 'studio',
-  'vocalRemoval',
   'volume'
 ];
 

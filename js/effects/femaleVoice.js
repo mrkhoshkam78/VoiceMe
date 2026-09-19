@@ -1,5 +1,6 @@
 /**
- * Professional Female / Girl / Woman – Pitch + Formant independent of speed
+ * Professional Female / Girl / Woman – V2.5.2 Pro
+ * Pitch + Formant independent of speed. Natural, not chipmunk.
  */
 import { createGain, createBiquad } from './baseEffect.js';
 import { VOCAL_PRESETS } from '../audio-engine/PitchProcessor.js';
@@ -10,7 +11,7 @@ export const meta = {
   description: 'Natural female character via pitch + formant + timbre — speed unchanged',
   icon: 'female',
   category: 'voice',
-  defaultParams: { mode: 'female', intensity: 0.8 },
+  defaultParams: { mode: 'female', intensity: 0.75 },
   requiresPitchProcess: true,
   pitchProcessKey: 'femaleVoice',
   paramHints: {
@@ -21,7 +22,7 @@ export const meta = {
 
 export function getPitchConfig(params = {}) {
   const mode = params.mode || 'female';
-  const intensity = Math.max(0, Math.min(1, params.intensity ?? 0.8));
+  const intensity = Math.max(0, Math.min(1, params.intensity ?? 0.75));
   const preset = VOCAL_PRESETS[mode] || VOCAL_PRESETS.female;
 
   const pitchRatio = 1 + (preset.pitchRatio - 1) * intensity;
@@ -44,7 +45,7 @@ export function getPitchConfig(params = {}) {
 
 /**
  * Real-time character EQ after offline pitch buffer
- * Chain: HPF → Body → Presence → Air → Comp → Output
+ * Chain: HPF → Body → Presence → Air → soft Comp → Output
  */
 export function createNodes(ctx, params = {}) {
   const cfg = getPitchConfig(params);
@@ -52,19 +53,20 @@ export function createNodes(ctx, params = {}) {
   const output = createGain(ctx, 1);
 
   const highpass = createBiquad(ctx, 'highpass', cfg.eq.lowCut, 0.7);
-  const body = createBiquad(ctx, 'peaking', 280, 0.9, cfg.eq.body || 0);
-  const presence = createBiquad(ctx, 'peaking', 2400, 1.2, cfg.eq.presence || 2.5);
-  const air = createBiquad(ctx, 'highshelf', 6000, 0.7, cfg.eq.air || 1.5);
-  const highShelf = createBiquad(ctx, 'highshelf', 3500, 1, Math.min(3, (cfg.eq.highShelf || 2) * 0.7));
+  const body = createBiquad(ctx, 'peaking', 260, 0.85, cfg.eq.body || 0);
+  const presence = createBiquad(ctx, 'peaking', 2500, 1.15, Math.min(3.5, cfg.eq.presence || 2.0));
+  const air = createBiquad(ctx, 'highshelf', 7500, 0.7, Math.min(2.2, cfg.eq.air || 1.2));
+  // Single high-shelf path – avoid double-bright stacking
+  const highShelf = createBiquad(ctx, 'highshelf', 4000, 0.9, Math.min(2.0, (cfg.eq.highShelf || 1.5) * 0.55));
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -20;
-  comp.knee.value = 10;
-  comp.ratio.value = 1.8;
+  comp.threshold.value = -18;
+  comp.knee.value = 12;
+  comp.ratio.value = 1.6;
   comp.attack.value = 0.012;
-  comp.release.value = 0.18;
+  comp.release.value = 0.2;
 
-  const makeup = createGain(ctx, 1.05);
+  const makeup = createGain(ctx, 1.02);
 
   input.connect(highpass);
   highpass.connect(body);
@@ -81,11 +83,12 @@ export function createNodes(ctx, params = {}) {
     pitchFactor: 1,
     update(p) {
       const c = getPitchConfig(p);
-      highpass.frequency.setTargetAtTime(c.eq.lowCut, ctx.currentTime, 0.05);
-      body.gain.setTargetAtTime(c.eq.body || 0, ctx.currentTime, 0.05);
-      presence.gain.setTargetAtTime(c.eq.presence || 2.5, ctx.currentTime, 0.05);
-      air.gain.setTargetAtTime(c.eq.air || 1.5, ctx.currentTime, 0.05);
-      highShelf.gain.setTargetAtTime(Math.min(3, (c.eq.highShelf || 2) * 0.7), ctx.currentTime, 0.05);
+      const t = ctx.currentTime;
+      highpass.frequency.setTargetAtTime(c.eq.lowCut, t, 0.05);
+      body.gain.setTargetAtTime(c.eq.body || 0, t, 0.05);
+      presence.gain.setTargetAtTime(Math.min(3.5, c.eq.presence || 2.0), t, 0.05);
+      air.gain.setTargetAtTime(Math.min(2.2, c.eq.air || 1.2), t, 0.05);
+      highShelf.gain.setTargetAtTime(Math.min(2.0, (c.eq.highShelf || 1.5) * 0.55), t, 0.05);
     }
   };
 }

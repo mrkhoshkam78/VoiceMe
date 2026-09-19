@@ -1,3 +1,7 @@
+/**
+ * Volume – V2.5.2 Pro
+ * Clean gain + true brickwall-style limiter for export safety.
+ */
 import { createGain } from './baseEffect.js';
 
 export const meta = {
@@ -15,12 +19,13 @@ export function createNodes(ctx, params = {}) {
   const output = createGain(ctx, 1);
   const gainNode = createGain(ctx, gainValue);
 
+  // Near-brickwall limiter for safety
   const limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = -2.5;
-  limiter.knee.value = 1.5;
-  limiter.ratio.value = 8.0;
+  limiter.threshold.value = -1.2;
+  limiter.knee.value = 0.5;
+  limiter.ratio.value = 20;
   limiter.attack.value = 0.001;
-  limiter.release.value = 0.04;
+  limiter.release.value = 0.05;
 
   input.connect(gainNode);
   gainNode.connect(limiter);
