@@ -1,4 +1,4 @@
-# VoiceMe V2.3.0
+# VoiceMe V2.5.1
 
 Hamburger navigation · Real AutoTune style profiles · Dotted EQ visualizer · Enhanced effects
 
@@ -10,11 +10,12 @@ Each style changes: amount, retuneSpeed, humanize, mix, scale, presence/air EQ, 
 npx serve .
 ```
 
-## V2.5.0 – Vocal Removal
+## V2.5.1 – Vocal Removal + Dual-Track Export
 
-- **حذف صدای خواننده** (Studio category): STFT چندبانده + Mid/Side coherence + Residual cleanup
-- حالت Fast / High Quality
+- **حذف صدای خواننده** (ارتقا یافته): Dual-res STFT + Mid/Side + harmonic continuity + residual formant cleanup
+- حالت Fast / High Quality — کیفیت High با FFT بزرگ‌تر و overlap بیشتر
 - A/B: Original ↔ Instrumental ↔ Vocal stem
+- **ترکیب Track A + B در Export** (مشکل قبلی حل شد — خروجی ترکیب‌شده دانلود می‌شود)
+- Gain / Mute / Solo برای هر ترک در خروجی اعمال می‌شود
 - Original همیشه Non-destructive می‌ماند
 - محدودیت: مدل عصبی Demucs نیست؛ بهترین نتیجه روی Stereo با Vocal مرکزی
-
