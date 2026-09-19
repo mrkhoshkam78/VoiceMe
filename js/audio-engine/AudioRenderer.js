@@ -9,7 +9,7 @@
  */
 import { createEffectNodes, effectsRegistry } from '../effects/index.js';
 
-const HEADROOM = 0.85; // V2.4.4 tighter inter-stage headroom ~-1.4 dBFS // ~ -1 dBFS peak target
+const HEADROOM = 0.92; // V2.5.2 – preserve dynamics between stages; master limiter still protects peaks
 
 export class AudioRenderer {
   constructor(ctxManager) {
