@@ -1012,18 +1012,18 @@ class App {
       body += this._chips(id, 'quality', 'کیفیت پردازش', [
         { v: 'fast', l: 'سریع (Fast)' }, { v: 'high', l: 'کیفیت بالا (HQ)' }
       ], p.quality || 'high');
-      body += this._slider(id, 'strength', 'قدرت حذف Vocal', 0, 100, (p.strength ?? 0.85) * 100, 0.01);
-      body += this._slider(id, 'vocalSuppress', 'حذف Residual', 0, 100, (p.vocalSuppress ?? 0.7) * 100, 0.01);
-      body += this._slider(id, 'instrumentPreserve', 'حفظ سازها', 0, 100, (p.instrumentPreserve ?? 0.65) * 100, 0.01);
-      body += this._slider(id, 'stereoPreserve', 'حفظ استریو', 0, 100, (p.stereoPreserve ?? 0.8) * 100, 0.01);
+      body += this._slider(id, 'strength', 'قدرت حذف Vocal', 0, 100, (p.strength ?? 0.9) * 100, 0.01);
+      body += this._slider(id, 'vocalSuppress', 'حذف Residual', 0, 100, (p.vocalSuppress ?? 0.8) * 100, 0.01);
+      body += this._slider(id, 'instrumentPreserve', 'حفظ سازها', 0, 100, (p.instrumentPreserve ?? 0.7) * 100, 0.01);
+      body += this._slider(id, 'stereoPreserve', 'حفظ استریو', 0, 100, (p.stereoPreserve ?? 0.85) * 100, 0.01);
       body += this._slider(id, 'outputGain', 'Gain خروجی', 50, 150, (p.outputGain ?? 1) * 100, 0.01);
       body += `<div class="control-row" style="margin-top:0.75rem">
         <button type="button" class="btn btn-primary" id="btnRunVocalRemoval" style="width:100%">
           اعمال حذف صدای خواننده
         </button>
         <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;line-height:1.45">
-          پردازش Offline است. پس از اتمام، Original / Instrumental / Vocal را مقایسه کنید.
-          بهترین نتیجه روی ترک Stereo با Vocal مرکزی است.
+          پردازش Offline پیشرفته (V2.5.1). پس از اتمام، Original / Instrumental / Vocal را مقایسه کنید.
+          بهترین نتیجه روی ترک Stereo با Vocal مرکزی است. برای خروجی تمیزتر کیفیت HQ را انتخاب کنید.
         </p>
       </div>`;
       if (this.engine.separationMeta) {
