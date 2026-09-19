@@ -380,13 +380,96 @@ export class AudioEngine {
 
   async export(options, onProgress) {
     if (!this.originalBuffer) throw new Error('NO_BUFFER');
-    const rendered = await this.renderer.render(
+    let rendered = await this.renderer.render(
       this.originalBuffer,
       this.effects,
       onProgress
     );
+
+    // Mix Track B into the final export when present (fixes missing combined output)
+    if (this.trackB?.buffer) {
+      if (onProgress) onProgress(0.96, 'ترکیب Track A + B...');
+      rendered = this._mixTracksForExport(rendered, this.trackB.buffer);
+    }
+
     const fileName = this.meta?.name || 'audio';
     return this.exporter.export(rendered, { ...options, fileName }, onProgress);
+  }
+
+  /**
+   * Mix rendered Track A with Track B at current gains / mute / solo.
+   * Handles different lengths and channel counts. Peak-limited to ~0.98.
+   */
+  _mixTracksForExport(bufA, bufB) {
+    const soloA = this.trackA.solo && !this.trackB.solo;
+    const soloB = this.trackB.solo && !this.trackA.solo;
+    const muteA = this.trackA.mute || soloB;
+    const muteB = this.trackB.mute || soloA;
+    const gainA = muteA ? 0 : (this.trackA.gain ?? 1);
+    const gainB = muteB ? 0 : (this.trackB.gain ?? 1);
+
+    // If one side is fully muted, return the other (scaled)
+    if (gainB < 1e-6 && gainA > 1e-6) {
+      return this._scaleBuffer(bufA, gainA);
+    }
+    if (gainA < 1e-6 && gainB > 1e-6) {
+      return this._scaleBuffer(bufB, gainB);
+    }
+    if (gainA < 1e-6 && gainB < 1e-6) {
+      // silence of max length
+      const len = Math.max(bufA.length, bufB.length);
+      const sr = bufA.sampleRate;
+      return new AudioBuffer({ length: len, numberOfChannels: 2, sampleRate: sr });
+    }
+
+    const sr = bufA.sampleRate;
+    const len = Math.max(bufA.length, bufB.length);
+    const ch = Math.max(bufA.numberOfChannels, bufB.numberOfChannels, 2);
+    const out = new AudioBuffer({ length: len, numberOfChannels: ch, sampleRate: sr });
+
+    const aCh = bufA.numberOfChannels;
+    const bCh = bufB.numberOfChannels;
+    let peak = 1e-9;
+
+    for (let c = 0; c < ch; c++) {
+      const dst = out.getChannelData(c);
+      const srcA = bufA.getChannelData(Math.min(c, aCh - 1));
+      const srcB = bufB.getChannelData(Math.min(c, bCh - 1));
+      const aLen = bufA.length;
+      const bLen = bufB.length;
+      for (let i = 0; i < len; i++) {
+        const va = i < aLen ? srcA[i] * gainA : 0;
+        const vb = i < bLen ? srcB[i] * gainB : 0;
+        const sum = va + vb;
+        dst[i] = sum;
+        const a = Math.abs(sum);
+        if (a > peak) peak = a;
+      }
+    }
+
+    if (peak > 0.98) {
+      const s = 0.98 / peak;
+      for (let c = 0; c < ch; c++) {
+        const d = out.getChannelData(c);
+        for (let i = 0; i < len; i++) d[i] *= s;
+      }
+    }
+    return out;
+  }
+
+  _scaleBuffer(buf, gain) {
+    if (Math.abs(gain - 1) < 1e-6) return buf;
+    const out = new AudioBuffer({
+      length: buf.length,
+      numberOfChannels: buf.numberOfChannels,
+      sampleRate: buf.sampleRate
+    });
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const src = buf.getChannelData(c);
+      const dst = out.getChannelData(c);
+      for (let i = 0; i < src.length; i++) dst[i] = src[i] * gain;
+    }
+    return out;
   }
 
   reset() {
