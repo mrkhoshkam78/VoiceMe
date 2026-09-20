@@ -1,13 +1,12 @@
 /**
- * Stage 2 — Intelligent Vocal Processing
- * Adaptive DSP chain driven by Stage 1 diagnosis.
- * Uses existing effect offline processors + live-node offline render where needed.
- * Records every step: params, reason, delta, success.
+ * Stage 2 — Intelligent Vocal Processing (V2.6.1)
+ * Conservative adaptive chain — avoids warble, over-reverb, over-NR.
+ * Offline AutoTune only when pitch severity is meaningful; always soft.
  */
 import { effectsRegistry } from '../effects/index.js';
 import { clamp } from '../utils/helpers.js';
 
-const HEADROOM = 0.92;
+const HEADROOM = 0.94;
 
 function limitPeaks(buffer, target = HEADROOM) {
   const ch = buffer.numberOfChannels;
@@ -50,26 +49,21 @@ function measurePeakRms(buffer) {
   };
 }
 
-/** Style → processing bias */
+/** Style bias — soft defaults for natural, pro vocal polish */
 const STYLE_BIAS = {
-  pop: { autotuneAmount: 0.72, reverbWet: 0.24, deess: 0.65, humanize: 0.28 },
-  traditional: { autotuneAmount: 0.38, reverbWet: 0.3, deess: 0.45, humanize: 0.55 },
-  rock: { autotuneAmount: 0.55, reverbWet: 0.2, deess: 0.55, humanize: 0.32 },
-  metal: { autotuneAmount: 0.82, reverbWet: 0.15, deess: 0.7, humanize: 0.12 },
-  rap: { autotuneAmount: 0.78, reverbWet: 0.12, deess: 0.75, humanize: 0.2 },
-  ballad: { autotuneAmount: 0.48, reverbWet: 0.35, deess: 0.5, humanize: 0.42 },
-  natural: { autotuneAmount: 0.35, reverbWet: 0.15, deess: 0.5, humanize: 0.5 }
+  pop: { autotuneAmount: 0.42, reverbWet: 0.16, deess: 0.55, humanize: 0.4 },
+  traditional: { autotuneAmount: 0.28, reverbWet: 0.2, deess: 0.4, humanize: 0.55 },
+  rock: { autotuneAmount: 0.38, reverbWet: 0.12, deess: 0.5, humanize: 0.35 },
+  metal: { autotuneAmount: 0.55, reverbWet: 0.1, deess: 0.6, humanize: 0.2 },
+  rap: { autotuneAmount: 0.5, reverbWet: 0.08, deess: 0.65, humanize: 0.25 },
+  ballad: { autotuneAmount: 0.32, reverbWet: 0.22, deess: 0.45, humanize: 0.48 },
+  natural: { autotuneAmount: 0.22, reverbWet: 0.1, deess: 0.4, humanize: 0.55 }
 };
 
-/**
- * Build adaptive effect list from diagnosis + user options.
- * @param {object} diagnosis - Stage 1 report
- * @param {object} options - { style, intensity 0..1, naturalness 0..1 }
- */
 export function planProcessing(diagnosis, options = {}) {
   const style = options.style || 'pop';
-  const intensity = clamp(options.intensity ?? 0.7, 0, 1);
-  const naturalness = clamp(options.naturalness ?? 0.6, 0, 1);
+  const intensity = clamp(options.intensity ?? 0.65, 0, 1);
+  const naturalness = clamp(options.naturalness ?? 0.7, 0, 1);
   const bias = STYLE_BIAS[style] || STYLE_BIAS.pop;
 
   const steps = [];
@@ -77,59 +71,84 @@ export function planProcessing(diagnosis, options = {}) {
   const has = (id) => issues.find(i => i.id === id);
   const sug = diagnosis?.suggestions || [];
 
-  // 1) Noise first if needed
-  const noiseSug = sug.find(s => s.effect === 'noiseReduction');
-  if (noiseSug || has('noise')) {
-    const p = { ...(noiseSug?.params || { strength: 0.5, sensitivity: 0.45, intensity: 0.65 }) };
-    p.strength = clamp(p.strength * (0.7 + intensity * 0.4), 0.25, 0.9);
-    steps.push({ id: 'noiseReduction', reason: noiseSug?.reason || 'کاهش نویز', params: p, offline: true });
+  // 1) Noise — only if clearly needed, mild
+  const noiseIssue = has('noise');
+  if (noiseIssue && noiseIssue.severity > 0.25) {
+    const p = {
+      strength: clamp(0.3 + noiseIssue.severity * 0.25 * intensity, 0.25, 0.55),
+      sensitivity: 0.4,
+      intensity: 0.55
+    };
+    steps.push({ id: 'noiseReduction', reason: 'کاهش نویز ملایم', params: p, offline: true });
   }
 
-  // 2) Pitch correction if needed
-  const pitchSug = sug.find(s => s.effect === 'autotune');
-  if (pitchSug || has('pitch') || has('pitchStability')) {
-    const p = { ...(pitchSug?.params || {}) };
-    p.amount = clamp((p.amount ?? bias.autotuneAmount) * (0.6 + intensity * 0.5) * (1.15 - naturalness * 0.35), 0.25, 0.92);
-    p.humanize = clamp((p.humanize ?? bias.humanize) * (0.7 + naturalness * 0.5), 0.1, 0.65);
-    p.retuneSpeed = clamp(p.retuneSpeed ?? 0.5, 0.2, 0.9);
-    p.mix = clamp(0.75 + intensity * 0.15, 0.7, 0.95);
-    p.style = style === 'traditional' ? 'traditional' : (style === 'rap' ? 'rap' : (style === 'metal' ? 'metal' : 'pop'));
-    p.key = options.key || diagnosis?.detectedKey || 'C';
-    p.scale = options.scale || 'major';
-    steps.push({ id: 'autotune', reason: pitchSug?.reason || 'اصلاح کوک تطبیقی', params: p, offline: true });
+  // 2) Pitch — ONLY when out-of-tune is significant (severity > 0.35)
+  // Offline AT was causing warble; keep soft + high humanize + dry mix
+  const pitchIssue = has('pitch') || has('pitchStability');
+  const pitchSev = Math.max(has('pitch')?.severity || 0, has('pitchStability')?.severity || 0);
+  if (pitchIssue && pitchSev > 0.35 && style !== 'natural') {
+    const p = {
+      amount: clamp(bias.autotuneAmount * (0.5 + pitchSev * 0.4) * intensity * (1.05 - naturalness * 0.4), 0.18, 0.55),
+      humanize: clamp(bias.humanize * (0.85 + naturalness * 0.3), 0.25, 0.65),
+      retuneSpeed: clamp(0.25 + (1 - naturalness) * 0.25, 0.2, 0.55),
+      mix: clamp(0.45 + intensity * 0.2 - naturalness * 0.1, 0.35, 0.7),
+      style: style === 'traditional' ? 'traditional' : (style === 'rap' ? 'rap' : 'pop'),
+      key: options.key || 'C',
+      scale: options.scale || 'major'
+    };
+    steps.push({ id: 'autotune', reason: 'اصلاح کوک نرم (ضد-warble)', params: p, offline: true });
   }
 
   // 3) De-ess / breath
-  const sibSug = sug.find(s => s.effect === 'breathSibilance');
-  if (sibSug || has('sibilance') || has('breath')) {
-    const p = { ...(sibSug?.params || { amount: 0.55, sibilance: 0.6, breath: 0.35, sensitivity: 0.5, freq: 6800 }) };
-    p.amount = clamp(p.amount * (0.75 + intensity * 0.35), 0.3, 0.9);
-    p.sibilance = clamp((p.sibilance ?? bias.deess) * (0.8 + intensity * 0.3), 0.3, 0.92);
-    steps.push({ id: 'breathSibilance', reason: sibSug?.reason || 'کنترل سیبیلانس/نفس', params: p, offline: false });
+  if (has('sibilance') || has('breath')) {
+    const sib = has('sibilance')?.severity || 0;
+    const br = has('breath')?.severity || 0;
+    steps.push({
+      id: 'breathSibilance',
+      reason: 'کنترل سیبیلانس/نفس',
+      params: {
+        amount: clamp(0.4 + Math.max(sib, br) * 0.3 * intensity, 0.35, 0.7),
+        sibilance: clamp(0.45 + sib * 0.35, 0.35, 0.8),
+        breath: clamp(0.3 + br * 0.35, 0.25, 0.65),
+        sensitivity: 0.45,
+        freq: 6800
+      },
+      offline: false
+    });
   }
 
-  // 4) Corrective EQ
-  const iqSug = sug.find(s => s.effect === 'improveQuality');
-  if (iqSug || has('mud') || has('harsh')) {
-    const p = { ...(iqSug?.params || { intensity: 0.55, clarity: 0.55, warmth: 0.35 }) };
-    p.intensity = clamp(p.intensity * (0.7 + intensity * 0.4), 0.3, 0.85);
-    steps.push({ id: 'improveQuality', reason: iqSug?.reason || 'EQ اصلاحی', params: p, offline: false });
+  // 4) Corrective EQ — core polish for almost all vocals
+  if (has('mud') || has('harsh') || has('tooQuiet') || issues.length === 0 || intensity > 0.3) {
+    steps.push({
+      id: 'improveQuality',
+      reason: 'EQ اصلاحی و وضوح',
+      params: {
+        intensity: clamp(0.4 + intensity * 0.25, 0.35, 0.7),
+        clarity: clamp(0.45 + (has('harsh')?.severity || 0.2) * 0.3, 0.4, 0.75),
+        warmth: has('mud') ? 0.25 : 0.4
+      },
+      offline: false
+    });
   }
 
   // 5) Level
-  if (has('clipping') || (diagnosis?.loudness?.peakDb > -0.5)) {
-    steps.push({ id: 'volume', reason: 'کاهش Gain برای جلوگیری از کلیپ', params: { gain: 0.88 }, offline: false });
-  } else if (diagnosis?.loudness?.rmsDb < -28) {
-    steps.push({ id: 'volume', reason: 'افزایش ملایم سطح وکال', params: { gain: clamp(1.1 + intensity * 0.15, 1.05, 1.35) }, offline: false });
+  if (has('clipping') || (diagnosis?.loudness?.peakDb != null && diagnosis.loudness.peakDb > -0.8)) {
+    steps.push({ id: 'volume', reason: 'کاهش Gain ضدکلیپ', params: { gain: 0.9 }, offline: false });
+  } else if (diagnosis?.loudness?.rmsDb != null && diagnosis.loudness.rmsDb < -30) {
+    steps.push({ id: 'volume', reason: 'افزایش ملایم سطح', params: { gain: clamp(1.08 + intensity * 0.1, 1.05, 1.22) }, offline: false });
   }
 
-  // 6) Space (style-dependent) — skip heavy reverb if background mix suspected
+  // 6) Studio space — light, never washout
   if (!has('backgroundMix')) {
-    const wet = clamp(bias.reverbWet * (0.7 + intensity * 0.5) * (1.1 - naturalness * 0.3), 0.08, 0.4);
+    const wet = clamp(bias.reverbWet * (0.65 + intensity * 0.35) * (1.05 - naturalness * 0.35), 0.06, 0.22);
     steps.push({
       id: 'studio',
-      reason: 'فضا و پولیش استودیویی متناسب با سبک',
-      params: { roomSize: clamp(0.3 + wet, 0.25, 0.65), wet, intensity: clamp(0.4 + intensity * 0.35, 0.35, 0.75) },
+      reason: 'فضای ملایم استودیویی',
+      params: {
+        roomSize: clamp(0.28 + wet * 0.8, 0.22, 0.5),
+        wet,
+        intensity: clamp(0.35 + intensity * 0.25, 0.3, 0.6)
+      },
       offline: false
     });
   }
@@ -139,14 +158,10 @@ export function planProcessing(diagnosis, options = {}) {
     intensity,
     naturalness,
     steps,
-    note: 'پردازش وکال — این مسترینگ کامل میکس نیست'
+    note: 'پردازش وکال محافظه‌کار — نه مسترینگ کامل میکس'
   };
 }
 
-/**
- * Execute processing plan on AudioBuffer.
- * @returns {{ buffer, log, plan }}
- */
 export async function processVocal(buffer, diagnosis, options = {}, onProgress) {
   const plan = planProcessing(diagnosis, options);
   const log = [];
@@ -162,9 +177,7 @@ export async function processVocal(buffer, diagnosis, options = {}, onProgress) 
     let success = false;
     let error = null;
 
-    if (onProgress) {
-      onProgress(0.05 + (i / total) * 0.85, `اعمال ${step.id}...`);
-    }
+    if (onProgress) onProgress(0.05 + (i / total) * 0.85, `اعمال ${step.id}...`);
 
     try {
       if (entry?.processOfflineBuffer && step.offline) {
@@ -174,7 +187,6 @@ export async function processVocal(buffer, diagnosis, options = {}, onProgress) 
         working = limitPeaks(working, HEADROOM);
         success = true;
       } else if (entry?.createNodes) {
-        // Offline render single effect via OfflineAudioContext
         working = await renderEffectOffline(working, step.id, step.params);
         working = limitPeaks(working, HEADROOM);
         success = true;
@@ -201,9 +213,7 @@ export async function processVocal(buffer, diagnosis, options = {}, onProgress) 
     await new Promise(r => setTimeout(r, 0));
   }
 
-  // Final gentle headroom
-  working = limitPeaks(working, 0.95);
-
+  working = limitPeaks(working, 0.96);
   if (onProgress) onProgress(1, 'پردازش کامل شد');
 
   return {
