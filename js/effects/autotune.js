@@ -249,8 +249,8 @@ export function createNodes(ctx, params = {}) {
   const wet = createGain(ctx, mix);
 
   const hp = createBiquad(ctx, 'highpass', 70, 0.7);
-  const presence = createBiquad(ctx, 'peaking', 2800, 1.2, 2 + amount * 3.5);
-  const air = createBiquad(ctx, 'highshelf', 7000, 1, formant ? 1.2 + amount : 2.5 + amount * 2);
+  const presence = createBiquad(ctx, 'peaking', 2800, 1.2, 2.5 + amount * 4);
+  const air = createBiquad(ctx, 'highshelf', 7000, 1, formant ? 1.5 + amount * 1.2 : 2.8 + amount * 2);
 
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -18 - retune * 5;
@@ -281,10 +281,10 @@ export function createNodes(ctx, params = {}) {
       dry.gain.setTargetAtTime(1 - m, ctx.currentTime, 0.04);
       wet.gain.setTargetAtTime(m, ctx.currentTime, 0.04);
       presence.gain.setTargetAtTime(
-        (st?.presenceGain ?? 2) + a * 2.5, ctx.currentTime, 0.05
+        (st?.presenceGain ?? 2.5) + a * 3.0, ctx.currentTime, 0.05
       );
       air.gain.setTargetAtTime(
-        form ? (st?.airGain ?? 1.2) + a * 0.8 : (st?.airGain ?? 2) + a * 1.5,
+        form ? (st?.airGain ?? 1.5) + a * 1.0 : (st?.airGain ?? 2.5) + a * 1.8,
         ctx.currentTime, 0.05
       );
       comp.ratio.setTargetAtTime((st?.compRatio ?? 2.2) + r * 1.2, ctx.currentTime, 0.05);
@@ -341,48 +341,89 @@ export async function processOfflineBuffer(audioBuffer, params = {}, onProgress)
     smoothed[f] = cnt > 0 ? sum / cnt : 0;
   }
 
-  const rateMap = new Float32Array(length);
-  rateMap.fill(1);
-
+  // Build per-frame rates then smooth across time to avoid warble
+  const frameRates = new Float32Array(numFrames);
+  frameRates.fill(1);
   for (let f = 0; f < numFrames; f++) {
     const freq = smoothed[f];
     if (freq <= 0) continue;
     const midi = freqToMidi(freq);
     const targetMidi = nearestScaleMidi(midi, keyIndex, scaleIntervals);
-    const corrected = midi + (targetMidi - midi) * amount * (1 - humanize * 0.4);
-    const micro = humanize > 0 ? (Math.random() - 0.5) * humanize * 0.12 : 0;
-    const playRate = clamp(freq / midiToFreq(corrected + micro), 0.72, 1.38);
+    // Soft correction — never full snap (prevents robotic / wavy artifacts)
+    const softAmount = amount * 0.85;
+    const corrected = midi + (targetMidi - midi) * softAmount * (1 - humanize * 0.5);
+    const micro = humanize > 0 ? (Math.sin(f * 0.37) * 0.5) * humanize * 0.06 : 0;
+    frameRates[f] = clamp(freq / midiToFreq(corrected + micro), 0.88, 1.14);
+  }
+  // Temporal smooth of rates
+  const smoothR = new Float32Array(numFrames);
+  const rHalf = Math.max(2, Math.round(3 + (1 - retuneSpeed) * 4));
+  for (let f = 0; f < numFrames; f++) {
+    let s = 0, c = 0;
+    for (let k = -rHalf; k <= rHalf; k++) {
+      const i = f + k;
+      if (i >= 0 && i < numFrames) { s += frameRates[i]; c++; }
+    }
+    smoothR[f] = s / c;
+  }
+
+  const rateMap = new Float32Array(length);
+  rateMap.fill(1);
+  for (let f = 0; f < numFrames; f++) {
     const start = f * hop;
     const end = Math.min(start + hop, length);
-    for (let i = start; i < end; i++) rateMap[i] = playRate;
+    const r0 = smoothR[f];
+    const r1 = smoothR[Math.min(f + 1, numFrames - 1)];
+    for (let i = start; i < end; i++) {
+      const t = (i - start) / Math.max(1, end - start);
+      rateMap[i] = r0 + (r1 - r0) * t;
+    }
   }
 
   if (onProgress) onProgress(0.4);
 
+  const mix = clamp(params.mix ?? preset.mix ?? 0.85, 0, 1);
   const outChannels = [];
   for (let ch = 0; ch < channels; ch++) {
     const src = audioBuffer.getChannelData(ch);
-    const out = [];
+    // Variable-rate resample into temporary, then force original length
+    const tmp = [];
     let srcPos = 0;
-    while (srcPos < length - 1) {
+    while (srcPos < length - 1 && tmp.length < length * 1.15) {
       const idx = Math.min(Math.floor(srcPos), length - 1);
       const rate = rateMap[idx] || 1;
       const i0 = Math.floor(srcPos);
       const i1 = Math.min(i0 + 1, length - 1);
       const frac = srcPos - i0;
-      out.push(src[i0] * (1 - frac) + src[i1] * frac);
+      tmp.push(src[i0] * (1 - frac) + src[i1] * frac);
       srcPos += rate;
     }
-    outChannels.push(new Float32Array(out));
+    // Resample tmp back to exact original length (preserves duration, reduces stretch warble)
+    const wet = new Float32Array(length);
+    if (tmp.length < 2) {
+      wet.set(src.subarray(0, length));
+    } else {
+      const scale = (tmp.length - 1) / Math.max(1, length - 1);
+      for (let i = 0; i < length; i++) {
+        const pos = i * scale;
+        const j0 = Math.min(Math.floor(pos), tmp.length - 1);
+        const j1 = Math.min(j0 + 1, tmp.length - 1);
+        const fr = pos - j0;
+        wet[i] = tmp[j0] * (1 - fr) + tmp[j1] * fr;
+      }
+    }
+    // Dry/wet mix — critical for natural sound
+    const mixed = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+      mixed[i] = src[i] * (1 - mix) + wet[i] * mix;
+    }
+    outChannels.push(mixed);
     if (onProgress) onProgress(0.4 + 0.55 * ((ch + 1) / channels));
   }
 
-  let minLen = outChannels[0].length;
-  for (let ch = 1; ch < channels; ch++) minLen = Math.min(minLen, outChannels[ch].length);
-
-  const outBuffer = new AudioBuffer({ length: minLen, numberOfChannels: channels, sampleRate: sr });
+  const outBuffer = new AudioBuffer({ length, numberOfChannels: channels, sampleRate: sr });
   for (let ch = 0; ch < channels; ch++) {
-    outBuffer.copyToChannel(outChannels[ch].subarray(0, minLen), ch);
+    outBuffer.copyToChannel(outChannels[ch], ch);
   }
   if (onProgress) onProgress(1);
   return outBuffer;
