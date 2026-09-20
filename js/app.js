@@ -247,8 +247,12 @@ class App {
     }
     // Re-render dynamic lists so labels follow language where possible
     try { this._renderSidebar?.(); } catch (_) {}
+    try { this._renderCategories?.(); } catch (_) {}
     try { this._updateSideStatus?.(); } catch (_) {}
     this._markActiveTheme?.();
+    // sidebar title
+    const st = document.querySelector('.effects-sidebar .sidebar-title');
+    if (st) st.textContent = t('effects_title', lang);
   }
 
 
@@ -514,7 +518,7 @@ class App {
 
   _renderSidebar() {
     const sidebar = this.$.effectsSidebar;
-    sidebar.innerHTML = '<div class="sidebar-title">افکت‌ها</div>';
+    sidebar.innerHTML = '<div class="sidebar-title">' + this._tt('effects_title') + '</div>';
     const cats = (typeof effectCategories !== 'undefined') ? effectCategories : null;
     if (cats) {
       cats.forEach(cat => {
@@ -781,6 +785,7 @@ class App {
     
     on(this.$.btnExport, 'click', () => this._export());
     this._bindVocalStudio();
+    this._bindStudioShell();
 
     on(this.$.btnExportHdr, 'click', () => this._export());
     on(this.$.speedSelect, 'change', e => {
@@ -790,10 +795,14 @@ class App {
   }
 
   _wireEngine() {
-    this.engine.onTimeUpdate = (t) => {
+    this.engine.onTimeUpdate = (tm) => {
       if (this.isSeeking) return;
-      this.$.currentTime.textContent = formatDuration(t);
-      this.$.seekBar.value = t;
+      this.$.currentTime.textContent = formatDuration(tm);
+      this.$.seekBar.value = tm;
+      const bpCur = document.getElementById('bpTimeCur');
+      const bpSeek = document.getElementById('bpSeek');
+      if (bpCur) bpCur.textContent = formatDuration(tm);
+      if (bpSeek && this.engine.duration) bpSeek.value = (tm / this.engine.duration) * 100;
     };
     this.engine.onEnded = () => {
       this._setPlayIcon(false);
@@ -819,14 +828,17 @@ class App {
     }
     const panel = this.$.playerPanel || document.getElementById('playerPanel');
     if (panel) panel.classList.toggle('is-pulsing', !!playing);
-    // Global ambient pulse for entire editor (theme-aware CSS)
     document.body.classList.toggle('is-playing-pulse', !!playing);
     document.documentElement.classList.toggle('is-playing-pulse', !!playing);
     const st = this.$.playerStatus || document.getElementById('playerStatus');
     if (st) {
-      st.textContent = playing ? 'در حال پخش' : 'آماده';
+      st.textContent = playing ? this._tt('playing') : this._tt('ready');
       st.classList.toggle('is-paused', !playing);
     }
+    const bpPlay = document.getElementById('bpPlay');
+    if (bpPlay) bpPlay.textContent = playing ? '❚❚' : '▶';
+    const bpSub = document.getElementById('bpSub');
+    if (bpSub) bpSub.textContent = playing ? this._tt('playing') : this._tt('ready');
   }
 
   async _handleFile(file) {
@@ -855,6 +867,7 @@ class App {
 
       this._enterEditor();
       if (this.$.headerExport) this.$.headerExport.hidden = false;
+      this._showBottomPlayer(this.engine.meta);
       // Show editor panels FIRST so UI never stays blank
       if (this.$.playerPanel) this.$.playerPanel.classList.add('visible');
       if (this.$.effectsWorkspace) this.$.effectsWorkspace.classList.add('visible');
@@ -1450,6 +1463,143 @@ class App {
       const at = this.effectState?.autotune;
       this.$.sideAutotune.textContent = at?.enabled ? 'فعال' : 'خاموش';
     }
+  }
+
+
+
+  _bindStudioShell() {
+    this._renderCategories();
+    // Sidebar nav
+    document.querySelectorAll('.sb-link[data-nav]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nav = btn.dataset.nav;
+        document.querySelectorAll('.sb-link').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (nav === 'home') this._setView('home');
+        else if (nav === 'effects') this._setView('effects');
+        else if (nav === 'vocal') this._setView('vocal');
+        else if (nav === 'library') this._toast('info', this._tt('nav_library'), this._tt('library_soon'));
+        else if (nav === 'history') this._toast('info', this._tt('nav_history'), this._tt('history_soon'));
+        else if (nav === 'settings') this._toast('info', this._tt('nav_settings'), this._tt('settings_soon'));
+      });
+    });
+    // Search
+    const search = document.getElementById('fxSearch');
+    if (search) {
+      search.addEventListener('input', () => {
+        const q = (search.value || '').trim().toLowerCase();
+        this._setView('effects');
+        document.querySelectorAll('.effect-item').forEach(item => {
+          const name = (item.querySelector('.fx-name')?.textContent || '').toLowerCase();
+          const id = (item.dataset.id || '').toLowerCase();
+          item.style.display = (!q || name.includes(q) || id.includes(q)) ? '' : 'none';
+        });
+        document.querySelectorAll('.effect-cat-label').forEach(lab => {
+          // show label if any following items visible
+          let el = lab.nextElementSibling;
+          let any = false;
+          while (el && el.classList.contains('effect-item')) {
+            if (el.style.display !== 'none') any = true;
+            el = el.nextElementSibling;
+          }
+          lab.style.display = any || !q ? '' : 'none';
+        });
+      });
+    }
+    // Bottom player
+    const bpPlay = document.getElementById('bpPlay');
+    if (bpPlay) bpPlay.addEventListener('click', () => this.$.playBtn?.click());
+    const bpSeek = document.getElementById('bpSeek');
+    if (bpSeek) {
+      bpSeek.addEventListener('input', () => {
+        const dur = this.engine.duration || 0;
+        this.engine.seek((bpSeek.value / 100) * dur);
+      });
+    }
+    const bpVol = document.getElementById('bpVol');
+    if (bpVol) {
+      bpVol.addEventListener('input', () => {
+        const g = (parseFloat(bpVol.value) || 100) / 100;
+        this.engine.setTrackGain?.('A', g);
+      });
+    }
+  }
+
+  _setView(view) {
+    document.body.setAttribute('data-view', view);
+    if (view === 'vocal') {
+      document.getElementById('vocalStudio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (view === 'effects') {
+      document.getElementById('effectsWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  _renderCategories() {
+    const grid = document.getElementById('catGrid');
+    if (!grid) return;
+    const lang = this.lang || 'fa';
+    const cats = [
+      { id: 'correction', key: 'cat_correction', desc: 'cat_correction_desc', ids: ['autotune', 'breathSibilance', 'noiseReduction'], color: '#22d3ee' },
+      { id: 'tone', key: 'cat_tone', desc: 'cat_tone_desc', ids: ['bassBoost', 'improveQuality', 'volume'], color: '#a78bfa' },
+      { id: 'space', key: 'cat_space', desc: 'cat_space_desc', ids: ['echo', 'studio'], color: '#34d399' },
+      { id: 'voice', key: 'cat_voice', desc: 'cat_voice_desc', ids: ['femaleVoice', 'deepVoice'], color: '#f472b6' },
+      { id: 'character', key: 'cat_character', desc: 'cat_character_desc', ids: ['speaker', 'police'], color: '#fb923c' },
+      { id: 'studio', key: 'cat_studio', desc: 'cat_studio_desc', ids: ['vocalRemoval'], color: '#818cf8' },
+      { id: 'vocal-ai', key: 'cat_vocal_ai', desc: 'cat_vocal_ai_desc', ids: [], special: 'vocal', color: '#e879f9' }
+    ];
+    const svgFor = (id, color) => {
+      const svgs = {
+        correction: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 32c4-8 8-12 12-12s8 4 12 12 8 12 12 12" stroke="${color}" stroke-width="2" fill="none"/><circle cx="24" cy="18" r="4" stroke="${color}" stroke-width="2"/></svg>`,
+        tone: `<svg viewBox="0 0 48 48" fill="none"><rect x="10" y="20" width="6" height="16" rx="2" fill="${color}" opacity="0.7"/><rect x="20" y="12" width="6" height="24" rx="2" fill="${color}"/><rect x="30" y="16" width="6" height="20" rx="2" fill="${color}" opacity="0.85"/></svg>`,
+        space: `<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="6" stroke="${color}" stroke-width="2"/><circle cx="24" cy="24" r="12" stroke="${color}" stroke-width="1.5" opacity="0.6"/><circle cx="24" cy="24" r="18" stroke="${color}" stroke-width="1" opacity="0.35"/></svg>`,
+        voice: `<svg viewBox="0 0 48 48" fill="none"><rect x="18" y="8" width="12" height="22" rx="6" stroke="${color}" stroke-width="2"/><path d="M14 22v2a10 10 0 0 0 20 0v-2" stroke="${color}" stroke-width="2"/><line x1="24" y1="34" x2="24" y2="40" stroke="${color}" stroke-width="2"/><line x1="18" y1="40" x2="30" y2="40" stroke="${color}" stroke-width="2" stroke-linecap="round"/></svg>`,
+        character: `<svg viewBox="0 0 48 48" fill="none"><rect x="12" y="10" width="24" height="28" rx="4" stroke="${color}" stroke-width="2"/><circle cx="24" cy="24" r="6" stroke="${color}" stroke-width="2"/></svg>`,
+        studio: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 28c0-8 7-14 16-14s16 6 16 14" stroke="${color}" stroke-width="2"/><path d="M14 28v4M34 28v4M24 14v4" stroke="${color}" stroke-width="2"/></svg>`,
+        'vocal-ai': `<svg viewBox="0 0 48 48" fill="none"><path d="M10 30 Q16 10 24 24 T38 18" stroke="${color}" stroke-width="2.5" fill="none"/><circle cx="38" cy="18" r="3" fill="${color}"/></svg>`
+      };
+      return svgs[id] || svgs.tone;
+    };
+    grid.innerHTML = cats.map(c => {
+      const n = c.ids.length || 1;
+      const count = t('effects_count', lang).replace('{n}', String(n));
+      return `<button type="button" class="cat-card" data-cat="${c.id}" data-special="${c.special || ''}" data-ids="${c.ids.join(',')}">
+        <div class="cat-svg">${svgFor(c.id, c.color)}</div>
+        <h3>${t(c.key, lang)}</h3>
+        <p>${t(c.desc, lang)}</p>
+        <div class="cat-meta"><span class="cat-count">${count}</span><span class="cat-arrow">${t('enter_cat', lang)} ←</span></div>
+      </button>`;
+    }).join('');
+    grid.querySelectorAll('.cat-card').forEach(card => {
+      card.addEventListener('click', () => {
+        if (card.dataset.special === 'vocal') {
+          this._setView('vocal');
+          document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'vocal'));
+          return;
+        }
+        this._setView('effects');
+        document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'effects'));
+        const ids = (card.dataset.ids || '').split(',').filter(Boolean);
+        // Highlight category effects
+        document.querySelectorAll('.effect-item').forEach(item => {
+          const on = ids.includes(item.dataset.id);
+          item.style.outline = on ? '1px solid rgba(167,139,250,0.5)' : '';
+          if (on && ids[0] === item.dataset.id) item.click();
+        });
+      });
+    });
+  }
+
+  _showBottomPlayer(meta) {
+    const bp = document.getElementById('bottomPlayer');
+    if (!bp) return;
+    bp.hidden = false;
+    const title = document.getElementById('bpTitle');
+    const sub = document.getElementById('bpSub');
+    if (title) title.textContent = meta?.name || '—';
+    if (sub) sub.textContent = this._tt('ready');
+    const tot = document.getElementById('bpTimeTot');
+    if (tot && meta?.duration) tot.textContent = formatDuration(meta.duration);
   }
 
 
