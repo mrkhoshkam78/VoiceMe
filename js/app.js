@@ -251,8 +251,8 @@ class App {
     try { this._updateSideStatus?.(); } catch (_) {}
     this._markActiveTheme?.();
     // sidebar title
-    const st = document.querySelector('.effects-sidebar .sidebar-title');
-    if (st) st.textContent = t('effects_title', lang);
+    const sideTitle = document.querySelector('.effects-sidebar .sidebar-title');
+    if (sideTitle) sideTitle.textContent = t('effects_title', lang);
   }
 
 
