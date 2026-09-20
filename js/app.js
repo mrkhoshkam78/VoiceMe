@@ -12,6 +12,8 @@ import {
   formatDuration, formatFileSize, isSupportedFormat,
   debounce, NOTE_NAMES, clamp
 } from './utils/helpers.js';
+import { VocalStudioEngine } from './vocal-studio/VocalStudioEngine.js';
+import { formatReportHTML, stageLabel } from './vocal-studio/ui.js';
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
@@ -44,6 +46,8 @@ class App {
   constructor() {
     this.engine = new AudioEngine();
     this.effectState = {};
+    this.vocalStudio = new VocalStudioEngine();
+    this._vsBusy = false;
     this.selectedEffect = null;
     this.isProcessing = false;
     this.isSeeking = false;
@@ -774,7 +778,10 @@ class App {
       this.engine.setTrackSolo('B', e.currentTarget.classList.contains('active'));
     });
 
+    
     on(this.$.btnExport, 'click', () => this._export());
+    this._bindVocalStudio();
+
     on(this.$.btnExportHdr, 'click', () => this._export());
     on(this.$.speedSelect, 'change', e => {
       const v = parseFloat(e.target.value) || 1;
@@ -1444,6 +1451,150 @@ class App {
       this.$.sideAutotune.textContent = at?.enabled ? 'فعال' : 'خاموش';
     }
   }
+
+
+  /* ── AI Vocal Production Studio ── */
+  _bindVocalStudio() {
+    const run = document.getElementById('btnVsRun');
+    const analyze = document.getElementById('btnVsAnalyze');
+    const abort = document.getElementById('btnVsAbort');
+    const abO = document.getElementById('btnVsOriginal');
+    const abP = document.getElementById('btnVsProcessed');
+    const inten = document.getElementById('vsIntensity');
+    const nat = document.getElementById('vsNatural');
+    const intenVal = document.getElementById('vsIntensityVal');
+    const natVal = document.getElementById('vsNaturalVal');
+
+    if (inten) inten.addEventListener('input', () => {
+      if (intenVal) intenVal.textContent = inten.value + '٪';
+    });
+    if (nat) nat.addEventListener('input', () => {
+      if (natVal) natVal.textContent = nat.value + '٪';
+    });
+    if (run) run.addEventListener('click', () => this._vsRunFull());
+    if (analyze) analyze.addEventListener('click', () => this._vsAnalyzeOnly());
+    if (abort) abort.addEventListener('click', () => {
+      this.vocalStudio.abort();
+      this._toast('info', 'لغو', 'درخواست لغو ارسال شد');
+    });
+    if (abO) abO.addEventListener('click', () => this._vsPlayAB('original'));
+    if (abP) abP.addEventListener('click', () => this._vsPlayAB('processed'));
+  }
+
+  _vsCollectOptions() {
+    const style = document.getElementById('vsStyle')?.value || 'pop';
+    const intensity = (parseInt(document.getElementById('vsIntensity')?.value || '70', 10)) / 100;
+    const naturalness = (parseInt(document.getElementById('vsNatural')?.value || '60', 10)) / 100;
+    return { style, intensity, naturalness };
+  }
+
+  _vsSetStage(active, doneUpTo = 0) {
+    document.querySelectorAll('.vs-stage').forEach(el => {
+      const s = parseInt(el.dataset.stage, 10);
+      el.classList.toggle('active', s === active);
+      el.classList.toggle('done', s <= doneUpTo && s !== active);
+    });
+  }
+
+  _vsProgress(stage, p, label) {
+    const wrap = document.getElementById('vsProgressWrap');
+    const fill = document.getElementById('vsProgressFill');
+    const lab = document.getElementById('vsProgressLabel');
+    if (wrap) wrap.hidden = false;
+    if (fill) fill.style.width = Math.round(p * 100) + '%';
+    if (lab) lab.textContent = (stageLabel(stage) || '') + (label ? ' — ' + label : '');
+    this._vsSetStage(stage, stage - 1);
+  }
+
+  async _vsRunFull() {
+    if (!this.engine.originalBuffer) {
+      this._toast('error', 'فایلی نیست', 'ابتدا یک فایل صوتی آپلود کنید');
+      return;
+    }
+    if (this._vsBusy) return;
+    this._vsBusy = true;
+    const abortBtn = document.getElementById('btnVsAbort');
+    if (abortBtn) abortBtn.hidden = false;
+    if (this.$.btnExport) this.$.btnExport.disabled = true;
+
+    this.vocalStudio.reset();
+    this.vocalStudio.setOptions(this._vsCollectOptions());
+
+    try {
+      const report = await this.vocalStudio.runFull(
+        this.engine.originalBuffer,
+        this.engine.meta || {},
+        (stage, p, label) => this._vsProgress(stage, p, label)
+      );
+      this._vsSetStage(3, 3);
+      const reportEl = document.getElementById('vsReport');
+      if (reportEl) reportEl.innerHTML = formatReportHTML(report);
+
+      const proc = this.vocalStudio.getProcessedBuffer();
+      if (proc) {
+        this.engine._vsOutputBuffer = proc;
+        this.engine.player.setBuffer(proc);
+        document.getElementById('btnVsOriginal')?.removeAttribute('disabled');
+        document.getElementById('btnVsProcessed')?.removeAttribute('disabled');
+        this._toast('success', 'وکال آماده است', 'A/B را امتحان کنید');
+      }
+    } catch (err) {
+      if (err && err.message === 'ABORTED') {
+        this._toast('info', 'لغو شد', 'پردازش متوقف شد');
+      } else {
+        console.error(err);
+        this._toast('error', 'خطا', (err && err.message) || 'پردازش ناموفق');
+      }
+    } finally {
+      this._vsBusy = false;
+      if (abortBtn) abortBtn.hidden = true;
+      if (this.$.btnExport) this.$.btnExport.disabled = false;
+      const wrap = document.getElementById('vsProgressWrap');
+      if (wrap) setTimeout(() => { wrap.hidden = true; }, 800);
+    }
+  }
+
+  async _vsAnalyzeOnly() {
+    if (!this.engine.originalBuffer) {
+      this._toast('error', 'فایلی نیست', 'ابتدا یک فایل صوتی آپلود کنید');
+      return;
+    }
+    if (this._vsBusy) return;
+    this._vsBusy = true;
+    try {
+      this.vocalStudio.reset();
+      const diagnosis = await this.vocalStudio.runAnalyze(
+        this.engine.originalBuffer,
+        this.engine.meta || {},
+        (stage, p, label) => this._vsProgress(stage, p, label)
+      );
+      this._vsSetStage(1, 1);
+      const reportEl = document.getElementById('vsReport');
+      if (reportEl) reportEl.innerHTML = formatReportHTML({ diagnosis });
+      this._toast('success', 'تحلیل کامل', `اطمینان ${Math.round((diagnosis.analysisConfidence || 0) * 100)}٪`);
+    } catch (err) {
+      console.error(err);
+      this._toast('error', 'خطا', (err && err.message) || 'تحلیل ناموفق');
+    } finally {
+      this._vsBusy = false;
+      const wrap = document.getElementById('vsProgressWrap');
+      if (wrap) setTimeout(() => { wrap.hidden = true; }, 600);
+    }
+  }
+
+  _vsPlayAB(which) {
+    const orig = this.vocalStudio.getOriginalBuffer() || this.engine.originalBuffer;
+    const proc = this.vocalStudio.getProcessedBuffer();
+    const buf = which === 'processed' ? proc : orig;
+    if (!buf) return;
+    const was = this.engine.player.isPlaying;
+    const t = this.engine.player.currentTime;
+    this.engine.player.setBuffer(buf);
+    if (was) this.engine.player.play(Math.min(t, buf.duration));
+    else this.engine.player.play(0);
+    this._toast('info', 'A/B', which === 'processed' ? 'پردازش‌شده' : 'اصلی');
+  }
+
 
   _toast(type, title, msg) {
     const el = document.createElement('div');
