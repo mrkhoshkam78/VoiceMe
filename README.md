@@ -1,21 +1,15 @@
-# VoiceMe V2.5.1
+# VoiceMe V2.7.0
 
-Hamburger navigation · Real AutoTune style profiles · Dotted EQ visualizer · Enhanced effects
+## UI Shell
+- Category cards (2-col), search, bottom player, dark navy glass theme
+- Full fa/en i18n with RTL/LTR without full page refresh
+- Sidebar navigation (home / effects / AI vocal)
 
-## AutoTune Styles (real DSP)
-Each style changes: amount, retuneSpeed, humanize, mix, scale, presence/air EQ, compressor, pitch-smooth window.
+## Vocal Studio fix
+- Auto-Tune offline: smoothed rates, duration preserved, dry/wet mix (anti-warble)
+- Conservative adaptive chain — soft NR/AT/reverb
 
 ## Run
 ```bash
 npx serve .
 ```
-
-## V2.5.1 – Vocal Removal + Dual-Track Export
-
-- **حذف صدای خواننده** (ارتقا یافته): Dual-res STFT + Mid/Side + harmonic continuity + residual formant cleanup
-- حالت Fast / High Quality — کیفیت High با FFT بزرگ‌تر و overlap بیشتر
-- A/B: Original ↔ Instrumental ↔ Vocal stem
-- **ترکیب Track A + B در Export** (مشکل قبلی حل شد — خروجی ترکیب‌شده دانلود می‌شود)
-- Gain / Mute / Solo برای هر ترک در خروجی اعمال می‌شود
-- Original همیشه Non-destructive می‌ماند
-- محدودیت: مدل عصبی Demucs نیست؛ بهترین نتیجه روی Stereo با Vocal مرکزی
