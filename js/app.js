@@ -715,6 +715,37 @@ class App {
         return;
       }
 
+      if (param === 'intensityMode') {
+        this.effectState[id].params.intensityMode = value;
+        const presets = {
+          bassBoost: {
+            low: { amount: 3.0, frequency: 85, q: 0.75 },
+            medium: { amount: 5.5, frequency: 95, q: 0.9 },
+            strong: { amount: 8.0, frequency: 105, q: 1.1 }
+          },
+          studio: {
+            low: { roomSize: 0.3, wet: 0.22, intensity: 0.5 },
+            medium: { roomSize: 0.5, wet: 0.38, intensity: 0.75 },
+            strong: { roomSize: 0.72, wet: 0.48, intensity: 0.95 }
+          },
+          noiseReduction: {
+            low: { strength: 0.35, sensitivity: 0.35, intensity: 0.45 },
+            medium: { strength: 0.6, sensitivity: 0.5, intensity: 0.75 },
+            strong: { strength: 0.85, sensitivity: 0.7, intensity: 0.95 }
+          },
+          vocalRemoval: {
+            low: { strength: 0.55, vocalSuppress: 0.45, instrumentPreserve: 0.85, intensity: 0.5 },
+            medium: { strength: 0.85, vocalSuppress: 0.75, instrumentPreserve: 0.7, intensity: 0.9 },
+            strong: { strength: 0.98, vocalSuppress: 0.92, instrumentPreserve: 0.55, intensity: 1.0 }
+          }
+        };
+        const pr = presets[id]?.[value];
+        if (pr) Object.assign(this.effectState[id].params, pr);
+        this._renderControls(id);
+        this._syncEffects();
+        return;
+      }
+
       this.effectState[id].params[param] = value;
       chip.parentElement.querySelectorAll('.option-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
@@ -987,9 +1018,9 @@ class App {
       body += this._chips(id, 'mode', 'حالت', [
         { v: 'girl', l: 'Girl' }, { v: 'female', l: 'Female' }, { v: 'woman', l: 'Woman' }
       ], p.mode);
-      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.75) * 100, 0.01);
+      body += this._slider(id, 'intensity', 'شدت تغییر صدا', 0, 100, (p.intensity ?? 0.85) * 100, 0.01);
     } else if (id === 'deepVoice') {
-      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.7) * 100, 0.01);
+      body += this._slider(id, 'intensity', 'شدت تغییر صدا', 0, 100, (p.intensity ?? 0.85) * 100, 0.01);
     } else if (id === 'autotune') {
       body += this._chips(id, 'style', 'سبک موسیقی', [
         { v: 'pop', l: 'پاپ' }, { v: 'traditional', l: 'سنتی' },
@@ -1018,19 +1049,31 @@ class App {
       body += this._slider(id, 'feedback', 'بازخورد', 0, 80, (p.feedback ?? 0.4) * 100, 0.01);
       body += this._slider(id, 'mix', 'مخلوط', 0, 100, (p.mix ?? 0.45) * 100, 0.01);
     } else if (id === 'studio') {
+      body += this._chips(id, 'intensityMode', 'شدت خودکار', [
+        { v: 'low', l: 'کم' }, { v: 'medium', l: 'متوسط' }, { v: 'strong', l: 'قوی' }
+      ], p.intensityMode || 'medium');
       body += this._slider(id, 'roomSize', 'اندازه فضا', 10, 100, (p.roomSize ?? 0.5) * 100, 0.01);
-      body += this._slider(id, 'wet', 'میزان ریورب', 5, 60, (p.wet ?? 0.32) * 100, 0.01);
-      body += this._slider(id, 'intensity', 'شدت فیلتر', 20, 100, (p.intensity ?? 0.65) * 100, 0.01);
+      body += this._slider(id, 'wet', 'میزان ریورب', 5, 60, (p.wet ?? 0.38) * 100, 0.01);
+      body += this._slider(id, 'intensity', 'شدت پردازش', 20, 100, (p.intensity ?? 0.75) * 100, 0.01);
     } else if (id === 'bassBoost') {
-      body += this._slider(id, 'amount', 'مقدار بیس', 0, 15, p.amount ?? 8, 1, 'dB');
-      body += this._slider(id, 'frequency', 'فرکانس', 60, 200, p.frequency ?? 95, 1, 'Hz');
+      body += this._chips(id, 'intensityMode', 'شدت خودکار', [
+        { v: 'low', l: 'کم' }, { v: 'medium', l: 'متوسط' }, { v: 'strong', l: 'قوی' }
+      ], p.intensityMode || 'medium');
+      body += this._slider(id, 'amount', 'مقدار بیس', 0, 12, p.amount ?? 5.5, 0.5, 'dB');
+      body += this._slider(id, 'frequency', 'فرکانس', 50, 200, p.frequency ?? 95, 1, 'Hz');
     } else if (id === 'volume') {
       body += this._slider(id, 'gain', 'بلندی', 10, 300, (p.gain ?? 1) * 100, 0.01);
     } else if (id === 'noiseReduction') {
-      body += this._slider(id, 'strength', 'قدرت کاهش', 0, 100, (p.strength ?? 0.55) * 100, 0.01);
+      body += this._chips(id, 'intensityMode', 'شدت خودکار', [
+        { v: 'low', l: 'کم' }, { v: 'medium', l: 'متوسط' }, { v: 'strong', l: 'قوی' }
+      ], p.intensityMode || 'medium');
+      body += this._slider(id, 'strength', 'قدرت کاهش', 0, 100, (p.strength ?? 0.6) * 100, 0.01);
       body += this._slider(id, 'sensitivity', 'حساسیت', 0, 100, (p.sensitivity ?? 0.5) * 100, 0.01);
-      body += this._slider(id, 'intensity', 'شدت فیلتر', 0, 100, (p.intensity ?? 0.7) * 100, 0.01);
+      body += this._slider(id, 'intensity', 'شدت پردازش', 0, 100, (p.intensity ?? 0.75) * 100, 0.01);
     } else if (id === 'vocalRemoval') {
+      body += this._chips(id, 'intensityMode', 'شدت خودکار', [
+        { v: 'low', l: 'کم' }, { v: 'medium', l: 'متوسط' }, { v: 'strong', l: 'قوی' }
+      ], p.intensityMode || 'medium');
       body += this._chips(id, 'quality', 'کیفیت پردازش', [
         { v: 'fast', l: 'سریع (Fast)' }, { v: 'high', l: 'کیفیت بالا (HQ)' }
       ], p.quality || 'high');
@@ -1673,26 +1716,58 @@ class App {
     }
     if (!this.engine?.originalBuffer) {
       this._toast('info', this._tt('effects_title'), this._tt('need_file_for_fx'));
-      // still show effects panel filtered
     }
+    this._activeCategoryIds = ids;
     this._setView('effects');
     document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'effects'));
-    // Filter sidebar to this category only
-    document.querySelectorAll('.effect-item').forEach(item => {
-      const on = ids.includes(item.dataset.id);
-      item.style.display = on ? '' : 'none';
-      item.style.outline = on ? '1px solid rgba(167,139,250,0.45)' : '';
-    });
-    document.querySelectorAll('.effect-cat-label').forEach(lab => {
-      lab.style.display = 'none';
-    });
-    // Select first effect in category
+    this._applyCategoryFilter(ids);
     const first = ids[0];
     if (first) {
       const el = document.querySelector(`.effect-item[data-id="${first}"]`);
       if (el) el.click();
     }
     document.getElementById('effectsWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  _applyCategoryFilter(ids) {
+    const sidebar = document.getElementById('effectsSidebar');
+    // Ensure back control exists
+    let bar = document.getElementById('catBackBar');
+    if (!bar && sidebar) {
+      bar = document.createElement('div');
+      bar.id = 'catBackBar';
+      bar.className = 'cat-back-bar';
+      sidebar.insertBefore(bar, sidebar.firstChild);
+    }
+    if (bar) {
+      const lang = this.lang || 'fa';
+      bar.innerHTML = `<button type="button" class="btn btn-ghost btn-sm" id="btnCatBack">← ${lang === 'fa' ? 'بستن دسته / همه افکت‌ها' : 'Close category / All effects'}</button>`;
+      bar.hidden = false;
+      document.getElementById('btnCatBack')?.addEventListener('click', () => this._closeCategory());
+    }
+    document.querySelectorAll('.effect-item').forEach(item => {
+      const on = !ids || ids.length === 0 || ids.includes(item.dataset.id);
+      item.style.display = on ? '' : 'none';
+      item.style.outline = (ids && ids.includes(item.dataset.id)) ? '1px solid rgba(167,139,250,0.45)' : '';
+    });
+    document.querySelectorAll('.effect-cat-label').forEach(lab => {
+      lab.style.display = ids && ids.length ? 'none' : '';
+    });
+  }
+
+  _closeCategory() {
+    this._activeCategoryIds = null;
+    document.querySelectorAll('.effect-item').forEach(item => {
+      item.style.display = '';
+      item.style.outline = '';
+    });
+    document.querySelectorAll('.effect-cat-label').forEach(lab => {
+      lab.style.display = '';
+    });
+    const bar = document.getElementById('catBackBar');
+    if (bar) bar.hidden = true;
+    this._setView('home');
+    document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'home'));
   }
 
   _showBottomPlayer(meta) {
