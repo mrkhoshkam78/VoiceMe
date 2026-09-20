@@ -535,7 +535,7 @@ class App {
           item.tabIndex = 0;
           item.innerHTML = `
             <div class="fx-icon">${ICONS[meta.icon] || ICONS.quality}</div>
-            <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
+            <div class="fx-label"><div class="fx-name">${this._fxDisplayName(id)}</div></div>
             <label class="fx-toggle" data-toggle-wrap="${id}">
               <input type="checkbox" data-toggle="${id}" ${this.effectState[id]?.enabled ? 'checked' : ''} aria-label="فعال‌سازی ${meta.name}">
               <span class="fx-toggle-track"></span>
@@ -551,7 +551,7 @@ class App {
         item.dataset.id = id;
         item.innerHTML = `
           <div class="fx-icon">${ICONS[meta.icon] || ''}</div>
-          <div class="fx-label"><div class="fx-name">${meta.name}</div></div>
+          <div class="fx-label"><div class="fx-name">${this._fxDisplayName(id)}</div></div>
           <label class="fx-toggle" data-toggle-wrap="${id}">
             <input type="checkbox" data-toggle="${id}">
             <span class="fx-toggle-track"></span>
@@ -786,6 +786,8 @@ class App {
     on(this.$.btnExport, 'click', () => this._export());
     this._bindVocalStudio();
     this._bindStudioShell();
+    const browse = document.getElementById('btnBrowseCats');
+    if (browse) browse.addEventListener('click', () => this._enterStudioHome());
 
     on(this.$.btnExportHdr, 'click', () => this._export());
     on(this.$.speedSelect, 'change', e => {
@@ -1467,6 +1469,71 @@ class App {
 
 
 
+
+  /** Show category home without requiring a file (matches reference UX) */
+  _enterStudioHome() {
+    document.body.setAttribute('data-page', 'editor');
+    document.body.setAttribute('data-view', 'home');
+    const landing = document.getElementById('landing');
+    if (landing) {
+      landing.classList.add('hidden');
+      landing.style.display = 'none';
+      landing.setAttribute('aria-hidden', 'true');
+    }
+    if (this.$.mainApp) {
+      this.$.mainApp.style.display = 'flex';
+      this.$.mainApp.classList.add('entering');
+    }
+    const bp = document.getElementById('bottomPlayer');
+    if (bp) {
+      bp.hidden = false;
+      const title = document.getElementById('bpTitle');
+      const sub = document.getElementById('bpSub');
+      if (title) title.textContent = this._tt('no_track');
+      if (sub) sub.textContent = this._tt('brand_name');
+    }
+    this._renderCategories();
+    this._setView('home');
+  }
+
+
+  _fxDisplayName(id) {
+    const map = {
+      fa: {
+        autotune: 'Auto-Tune',
+        breathSibilance: 'نفس و سیبیلانس',
+        noiseReduction: 'کاهش نویز',
+        bassBoost: 'Bass / Low-End',
+        improveQuality: 'بهبود کیفیت',
+        volume: 'بلندی صدا',
+        echo: 'اکو (Echo)',
+        studio: 'استودیو / Reverb',
+        femaleVoice: 'صدای زنانه',
+        deepVoice: 'صدای مردانه',
+        speaker: 'بلندگو',
+        police: 'پلیس / رادیو',
+        vocalRemoval: 'حذف صدای خواننده'
+      },
+      en: {
+        autotune: 'Auto-Tune',
+        breathSibilance: 'Breath & Sibilance',
+        noiseReduction: 'Noise Reduction',
+        bassBoost: 'Bass / Low-End',
+        improveQuality: 'Improve Quality',
+        volume: 'Volume',
+        echo: 'Echo',
+        studio: 'Studio / Reverb',
+        femaleVoice: 'Female Voice',
+        deepVoice: 'Male Voice',
+        speaker: 'Speaker',
+        police: 'Police / Radio',
+        vocalRemoval: 'Vocal Removal'
+      }
+    };
+    const lang = this.lang || 'fa';
+    return map[lang]?.[id] || effectsRegistry[id]?.meta?.name || id;
+  }
+
   _bindStudioShell() {
     this._renderCategories();
     // Sidebar nav
@@ -1527,11 +1594,24 @@ class App {
 
   _setView(view) {
     document.body.setAttribute('data-view', view);
-    if (view === 'vocal') {
-      document.getElementById('vocalStudio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    const home = document.getElementById('homeCategories');
+    const fx = document.getElementById('effectsWorkspace');
+    const vs = document.getElementById('vocalStudio');
+    const chain = document.getElementById('chainBar');
+    if (home) home.style.display = view === 'home' ? '' : 'none';
+    if (fx) fx.style.display = view === 'effects' ? 'flex' : 'none';
+    if (vs) vs.style.display = view === 'vocal' ? '' : 'none';
+    if (chain) chain.style.display = view === 'effects' ? '' : 'none';
     if (view === 'effects') {
-      document.getElementById('effectsWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // if no filter active, show all
+      document.getElementById('effectsWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    if (view === 'vocal') {
+      document.getElementById('vocalStudio')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    if (view === 'home') {
+      this._renderCategories();
+      document.getElementById('homeCategories')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
 
@@ -1539,55 +1619,80 @@ class App {
     const grid = document.getElementById('catGrid');
     if (!grid) return;
     const lang = this.lang || 'fa';
+    // Only real effects that exist in the project
     const cats = [
-      { id: 'correction', key: 'cat_correction', desc: 'cat_correction_desc', ids: ['autotune', 'breathSibilance', 'noiseReduction'], color: '#22d3ee' },
-      { id: 'tone', key: 'cat_tone', desc: 'cat_tone_desc', ids: ['bassBoost', 'improveQuality', 'volume'], color: '#a78bfa' },
-      { id: 'space', key: 'cat_space', desc: 'cat_space_desc', ids: ['echo', 'studio'], color: '#34d399' },
-      { id: 'voice', key: 'cat_voice', desc: 'cat_voice_desc', ids: ['femaleVoice', 'deepVoice'], color: '#f472b6' },
-      { id: 'character', key: 'cat_character', desc: 'cat_character_desc', ids: ['speaker', 'police'], color: '#fb923c' },
-      { id: 'studio', key: 'cat_studio', desc: 'cat_studio_desc', ids: ['vocalRemoval'], color: '#818cf8' },
-      { id: 'vocal-ai', key: 'cat_vocal_ai', desc: 'cat_vocal_ai_desc', ids: [], special: 'vocal', color: '#e879f9' }
+      { id: 'correction', key: 'cat_correction', desc: 'cat_correction_desc', ids: ['autotune', 'breathSibilance', 'noiseReduction'], gradient: 'linear-gradient(135deg,#7c3aed,#a855f7)' },
+      { id: 'tone', key: 'cat_tone', desc: 'cat_tone_desc', ids: ['bassBoost', 'improveQuality', 'volume'], gradient: 'linear-gradient(135deg,#0284c7,#06b6d4)' },
+      { id: 'space', key: 'cat_space', desc: 'cat_space_desc', ids: ['echo', 'studio'], gradient: 'linear-gradient(135deg,#ea580c,#f59e0b)' },
+      { id: 'voice', key: 'cat_voice', desc: 'cat_voice_desc', ids: ['femaleVoice', 'deepVoice'], gradient: 'linear-gradient(135deg,#db2777,#ec4899)' },
+      { id: 'character', key: 'cat_character', desc: 'cat_character_desc', ids: ['speaker', 'police'], gradient: 'linear-gradient(135deg,#0d9488,#14b8a6)' },
+      { id: 'studio', key: 'cat_studio', desc: 'cat_studio_desc', ids: ['vocalRemoval'], gradient: 'linear-gradient(135deg,#2563eb,#3b82f6)' },
+      { id: 'vocal-ai', key: 'cat_vocal_ai', desc: 'cat_vocal_ai_desc', ids: [], special: 'vocal', gradient: 'linear-gradient(135deg,#c026d3,#e879f9)' }
     ];
-    const svgFor = (id, color) => {
-      const svgs = {
-        correction: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 32c4-8 8-12 12-12s8 4 12 12 8 12 12 12" stroke="${color}" stroke-width="2" fill="none"/><circle cx="24" cy="18" r="4" stroke="${color}" stroke-width="2"/></svg>`,
-        tone: `<svg viewBox="0 0 48 48" fill="none"><rect x="10" y="20" width="6" height="16" rx="2" fill="${color}" opacity="0.7"/><rect x="20" y="12" width="6" height="24" rx="2" fill="${color}"/><rect x="30" y="16" width="6" height="20" rx="2" fill="${color}" opacity="0.85"/></svg>`,
-        space: `<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="6" stroke="${color}" stroke-width="2"/><circle cx="24" cy="24" r="12" stroke="${color}" stroke-width="1.5" opacity="0.6"/><circle cx="24" cy="24" r="18" stroke="${color}" stroke-width="1" opacity="0.35"/></svg>`,
-        voice: `<svg viewBox="0 0 48 48" fill="none"><rect x="18" y="8" width="12" height="22" rx="6" stroke="${color}" stroke-width="2"/><path d="M14 22v2a10 10 0 0 0 20 0v-2" stroke="${color}" stroke-width="2"/><line x1="24" y1="34" x2="24" y2="40" stroke="${color}" stroke-width="2"/><line x1="18" y1="40" x2="30" y2="40" stroke="${color}" stroke-width="2" stroke-linecap="round"/></svg>`,
-        character: `<svg viewBox="0 0 48 48" fill="none"><rect x="12" y="10" width="24" height="28" rx="4" stroke="${color}" stroke-width="2"/><circle cx="24" cy="24" r="6" stroke="${color}" stroke-width="2"/></svg>`,
-        studio: `<svg viewBox="0 0 48 48" fill="none"><path d="M8 28c0-8 7-14 16-14s16 6 16 14" stroke="${color}" stroke-width="2"/><path d="M14 28v4M34 28v4M24 14v4" stroke="${color}" stroke-width="2"/></svg>`,
-        'vocal-ai': `<svg viewBox="0 0 48 48" fill="none"><path d="M10 30 Q16 10 24 24 T38 18" stroke="${color}" stroke-width="2.5" fill="none"/><circle cx="38" cy="18" r="3" fill="${color}"/></svg>`
+    const svgFor = (id) => {
+      const map = {
+        correction: '<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="18" stroke="rgba(255,255,255,0.9)" stroke-width="2"/><path d="M32 18v14l10 6" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"/><path d="M48 32c4 0 8 2 10 6" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/></svg>',
+        tone: '<svg viewBox="0 0 64 64" fill="none"><path d="M20 40c0-10 5-18 12-18s12 8 12 18" stroke="#fff" stroke-width="2"/><circle cx="32" cy="28" r="8" stroke="#fff" stroke-width="2"/><path d="M12 36h8M44 36h8" stroke="#fff" stroke-width="1.5" opacity="0.6"/></svg>',
+        space: '<svg viewBox="0 0 64 64" fill="none"><ellipse cx="32" cy="36" rx="16" ry="6" stroke="#fff" stroke-width="2"/><ellipse cx="32" cy="32" rx="12" ry="4" stroke="#fff" stroke-width="1.5" opacity="0.7"/><ellipse cx="32" cy="28" rx="8" ry="3" stroke="#fff" stroke-width="1.5" opacity="0.5"/></svg>',
+        voice: '<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="24" r="10" stroke="#fff" stroke-width="2"/><path d="M18 48c0-8 6-14 14-14s14 6 14 14" stroke="#fff" stroke-width="2"/><path d="M42 20l6-4M44 28l8 2" stroke="#fff" stroke-width="1.5" opacity="0.7"/></svg>',
+        character: '<svg viewBox="0 0 64 64" fill="none"><rect x="18" y="14" width="28" height="36" rx="4" stroke="#fff" stroke-width="2"/><circle cx="32" cy="32" r="8" stroke="#fff" stroke-width="2"/></svg>',
+        studio: '<svg viewBox="0 0 64 64" fill="none"><path d="M12 32c4-10 10-16 20-16s16 6 20 16" stroke="#fff" stroke-width="2"/><path d="M16 32v6M48 32v6M32 16v6" stroke="#fff" stroke-width="2"/></svg>',
+        'vocal-ai': '<svg viewBox="0 0 64 64" fill="none"><path d="M16 40 L28 20 L36 36 L48 16" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="48" cy="16" r="4" fill="#fff"/></svg>'
       };
-      return svgs[id] || svgs.tone;
+      return map[id] || map.tone;
     };
     grid.innerHTML = cats.map(c => {
       const n = c.ids.length || 1;
       const count = t('effects_count', lang).replace('{n}', String(n));
-      return `<button type="button" class="cat-card" data-cat="${c.id}" data-special="${c.special || ''}" data-ids="${c.ids.join(',')}">
-        <div class="cat-svg">${svgFor(c.id, c.color)}</div>
-        <h3>${t(c.key, lang)}</h3>
-        <p>${t(c.desc, lang)}</p>
-        <div class="cat-meta"><span class="cat-count">${count}</span><span class="cat-arrow">${t('enter_cat', lang)} ←</span></div>
+      return `<button type="button" class="cat-card" data-cat="${c.id}" data-special="${c.special || ''}" data-ids="${c.ids.join(',')}" style="--cat-bg:${c.gradient}">
+        <div class="cat-card-inner">
+          <div class="cat-svg-wrap">${svgFor(c.id)}</div>
+          <div class="cat-text">
+            <div class="cat-top"><h3>${t(c.key, lang)}</h3><span class="cat-badge">${count}</span></div>
+            <p>${t(c.desc, lang)}</p>
+          </div>
+          <span class="cat-chevron" aria-hidden="true">‹</span>
+        </div>
       </button>`;
     }).join('');
     grid.querySelectorAll('.cat-card').forEach(card => {
-      card.addEventListener('click', () => {
-        if (card.dataset.special === 'vocal') {
-          this._setView('vocal');
-          document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'vocal'));
-          return;
-        }
-        this._setView('effects');
-        document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'effects'));
-        const ids = (card.dataset.ids || '').split(',').filter(Boolean);
-        // Highlight category effects
-        document.querySelectorAll('.effect-item').forEach(item => {
-          const on = ids.includes(item.dataset.id);
-          item.style.outline = on ? '1px solid rgba(167,139,250,0.5)' : '';
-          if (on && ids[0] === item.dataset.id) item.click();
-        });
-      });
+      card.addEventListener('click', () => this._openCategory(card));
     });
+  }
+
+  _openCategory(card) {
+    const special = card.dataset.special;
+    const ids = (card.dataset.ids || '').split(',').filter(Boolean);
+    if (special === 'vocal') {
+      if (!this.engine?.originalBuffer) {
+        this._toast('info', this._tt('nav_vocal_studio'), this._tt('need_file_for_fx'));
+      }
+      this._setView('vocal');
+      document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'vocal'));
+      return;
+    }
+    if (!this.engine?.originalBuffer) {
+      this._toast('info', this._tt('effects_title'), this._tt('need_file_for_fx'));
+      // still show effects panel filtered
+    }
+    this._setView('effects');
+    document.querySelectorAll('.sb-link').forEach(b => b.classList.toggle('active', b.dataset.nav === 'effects'));
+    // Filter sidebar to this category only
+    document.querySelectorAll('.effect-item').forEach(item => {
+      const on = ids.includes(item.dataset.id);
+      item.style.display = on ? '' : 'none';
+      item.style.outline = on ? '1px solid rgba(167,139,250,0.45)' : '';
+    });
+    document.querySelectorAll('.effect-cat-label').forEach(lab => {
+      lab.style.display = 'none';
+    });
+    // Select first effect in category
+    const first = ids[0];
+    if (first) {
+      const el = document.querySelector(`.effect-item[data-id="${first}"]`);
+      if (el) el.click();
+    }
+    document.getElementById('effectsWorkspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   _showBottomPlayer(meta) {
