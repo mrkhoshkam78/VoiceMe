@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="VoiceMe – Professional Vocal Studio. Vocal Changer · Music Maker.">
-  <title>VoiceMe V2.5.2 — Studio Pro Mix · AutoTune · Dotted Visualizer</title>
+  <title>VoiceMe V2.6.0 — Studio Pro Mix · AutoTune · Dotted Visualizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,7 +20,7 @@
         <h1>VoiceMe</h1>
         <span class="brand-sub" data-i18n="brand_sub">Vocal Changer · Music Maker</span>
       </div>
-      <span class="version-badge">V2.5.2</span>
+      <span class="version-badge">V2.6.0</span>
     </div>
 
     
@@ -204,6 +204,65 @@
           <span class="gain-val" id="gainValB">0 dB</span>
           <button type="button" class="icon-btn danger" id="removeB" title="حذف" disabled>×</button>
         </div>
+      </div>
+    </section>
+
+
+    <!-- AI Vocal Production Studio -->
+    <section class="vocal-studio" id="vocalStudio">
+      <div class="vs-header">
+        <div class="vs-title-row">
+          <h2 class="vs-title">AI Vocal Production Studio</h2>
+          <span class="vs-badge">۳ مرحله‌ای</span>
+        </div>
+        <p class="vs-desc">تحلیل هوشمند → پردازش تطبیقی → کنترل کیفیت — بدون ادعای مسترینگ کامل</p>
+      </div>
+
+      <div class="vs-options">
+        <label class="vs-field">سبک
+          <select id="vsStyle" class="vs-select">
+            <option value="pop">پاپ</option>
+            <option value="ballad">بالاد</option>
+            <option value="traditional">سنتی</option>
+            <option value="rock">راک</option>
+            <option value="rap">رپ</option>
+            <option value="metal">متال</option>
+            <option value="natural">طبیعی</option>
+          </select>
+        </label>
+        <label class="vs-field">شدت پردازش
+          <input type="range" id="vsIntensity" min="0" max="100" value="70" class="vs-range">
+          <span id="vsIntensityVal">70٪</span>
+        </label>
+        <label class="vs-field">طبیعی بودن
+          <input type="range" id="vsNatural" min="0" max="100" value="60" class="vs-range">
+          <span id="vsNaturalVal">60٪</span>
+        </label>
+      </div>
+
+      <div class="vs-stages" id="vsStages">
+        <div class="vs-stage" data-stage="1"><span class="vs-stage-num">1</span><span class="vs-stage-name">تحلیل</span></div>
+        <div class="vs-stage-line"></div>
+        <div class="vs-stage" data-stage="2"><span class="vs-stage-num">2</span><span class="vs-stage-name">پردازش</span></div>
+        <div class="vs-stage-line"></div>
+        <div class="vs-stage" data-stage="3"><span class="vs-stage-num">3</span><span class="vs-stage-name">QA</span></div>
+      </div>
+
+      <div class="vs-progress-wrap" id="vsProgressWrap" hidden>
+        <div class="vs-progress-label" id="vsProgressLabel">—</div>
+        <div class="progress-track"><div class="progress-fill" id="vsProgressFill"></div></div>
+      </div>
+
+      <div class="vs-actions">
+        <button type="button" class="btn btn-primary" id="btnVsRun">شروع تولید وکال</button>
+        <button type="button" class="btn btn-ghost" id="btnVsAnalyze">فقط تحلیل</button>
+        <button type="button" class="btn btn-ghost" id="btnVsAbort" hidden>لغو</button>
+        <button type="button" class="btn btn-ghost" id="btnVsOriginal" disabled>A/B اصلی</button>
+        <button type="button" class="btn btn-ghost" id="btnVsProcessed" disabled>A/B پردازش</button>
+      </div>
+
+      <div class="vs-report" id="vsReport">
+        <p class="vs-muted">پس از آپلود فایل، تولید وکال را شروع کنید.</p>
       </div>
     </section>
 
