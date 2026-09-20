@@ -165,9 +165,12 @@ export class AudioEngine {
       }
     }
 
-    // Always rebuild live graph when playing so enable/disable is heard immediately
+    // Realtime: rebuild graph so enable/disable is heard immediately when playing.
+    // Also rebuild when paused so the next play() starts with the correct chain.
     if (wasPlaying) {
       await this.player.rebuild();
+    } else if (this.player?.rebuild) {
+      try { await this.player.rebuild(); } catch (_) {}
     }
   }
 
