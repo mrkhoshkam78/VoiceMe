@@ -1,15 +1,16 @@
-# VoiceMe V2.7.0
+# VoiceMe V3.0.1
 
-## UI Shell
-- Category cards (2-col), search, bottom player, dark navy glass theme
-- Full fa/en i18n with RTL/LTR without full page refresh
-- Sidebar navigation (home / effects / AI vocal)
-
-## Vocal Studio fix
-- Auto-Tune offline: smoothed rates, duration preserved, dry/wet mix (anti-warble)
-- Conservative adaptive chain — soft NR/AT/reverb
+## Changes
+- Mobile responsive fixes (bottom player, categories, effects panel)
+- Stronger female/male voice (audible pitch + formant)
+- Category open/close with back button
+- Realtime effect graph rebuild on toggle
+- Auto intensity modes (low/medium/strong) for: Studio, Noise Reduction, Vocal Removal, Bass
+- Professional retune of effect defaults
 
 ## Run
 ```bash
 npx serve .
+# or
+python -m http.server 8080
 ```
