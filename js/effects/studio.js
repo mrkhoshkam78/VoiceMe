@@ -11,7 +11,12 @@ export const meta = {
   description: 'زنجیره استودیو: EQ اصلاحی، فشرده‌سازی، de-ess و فضای کنترل‌شده',
   icon: 'studio',
   category: 'space',
-  defaultParams: { roomSize: 0.4, wet: 0.22, intensity: 0.55 },
+  defaultParams: { intensityMode: 'medium', roomSize: 0.5, wet: 0.38, intensity: 0.75 },
+  intensityPresets: {
+    low: { roomSize: 0.3, wet: 0.22, intensity: 0.5 },
+    medium: { roomSize: 0.5, wet: 0.38, intensity: 0.75 },
+    strong: { roomSize: 0.72, wet: 0.48, intensity: 0.95 }
+  },
   paramUnits: { roomSize: 'ratio', wet: 'ratio', intensity: 'ratio' },
   paramRanges: {
     roomSize: [0.1, 1],
@@ -60,15 +65,22 @@ function createImpulse(ctx, duration, decay) {
   return impulse;
 }
 
+const STUDIO_PRESETS = {
+  low: { roomSize: 0.3, wet: 0.22, intensity: 0.5 },
+  medium: { roomSize: 0.5, wet: 0.38, intensity: 0.75 },
+  strong: { roomSize: 0.72, wet: 0.48, intensity: 0.95 }
+};
+
 export function createNodes(ctx, params = {}) {
-  let roomSize = clamp(params.roomSize ?? 0.4, 0.1, 1);
-  let wetAmt = clamp(params.wet ?? 0.22, 0, 0.55);
-  let intensity = clamp(params.intensity ?? 0.55, 0, 1);
+  const preset = STUDIO_PRESETS[params.intensityMode] || null;
+  let roomSize = clamp(params.roomSize ?? preset?.roomSize ?? 0.5, 0.1, 1);
+  let wetAmt = clamp(params.wet ?? preset?.wet ?? 0.38, 0, 0.55);
+  let intensity = clamp(params.intensity ?? preset?.intensity ?? 0.75, 0, 1);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
   const dry = createGain(ctx, 1 - wetAmt);
-  const wet = createGain(ctx, wetAmt * intensity * 0.95);
+  const wet = createGain(ctx, wetAmt * intensity);
 
   // Subtle vocal polish – not aggressive
   const hp = createBiquad(ctx, 'highpass', 55, 0.7);
@@ -114,7 +126,7 @@ export function createNodes(ctx, params = {}) {
       intensity = clamp(p.intensity ?? intensity, 0, 1);
       roomSize = clamp(p.roomSize ?? roomSize, 0.1, 1);
       dry.gain.setTargetAtTime(1 - wetAmt, t, 0.05);
-      wet.gain.setTargetAtTime(wetAmt * intensity * 0.95, t, 0.05);
+      wet.gain.setTargetAtTime(wetAmt * intensity, t, 0.05);
       presence.gain.setTargetAtTime(1.0 + intensity * 1.6, t, 0.05);
       air.gain.setTargetAtTime(0.5 + intensity * 0.9, t, 0.05);
       deess.gain.setTargetAtTime(-0.8 - intensity * 1.4, t, 0.05);

@@ -11,7 +11,7 @@ export const meta = {
   description: 'اصلاح mud/harshness و Presence طبیعی — نه فقط Treble',
   icon: 'quality',
   category: 'tone',
-  defaultParams: { intensity: 0.5, clarity: 0.5, warmth: 0.4 },
+  defaultParams: { intensity: 0.65, clarity: 0.6, warmth: 0.4 },
   paramUnits: { intensity: 'ratio', clarity: 'ratio', warmth: 'ratio' },
   paramRanges: {
     intensity: [0, 1],
@@ -25,8 +25,8 @@ function clamp01(v) {
 }
 
 export function createNodes(ctx, params = {}) {
-  let intensity = clamp01(params.intensity ?? 0.5);
-  let clarity = clamp01(params.clarity ?? 0.5);
+  let intensity = clamp01(params.intensity ?? 0.65);
+  let clarity = clamp01(params.clarity ?? 0.6);
   let warmth = clamp01(params.warmth ?? 0.4);
 
   const input = createGain(ctx, 1);

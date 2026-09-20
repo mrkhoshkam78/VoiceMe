@@ -12,10 +12,10 @@ export const meta = {
   icon: 'quality',
   category: 'correction',
   defaultParams: {
-    amount: 0.5,
-    sensitivity: 0.45,
-    sibilance: 0.6,
-    breath: 0.35,
+    amount: 0.6,
+    sensitivity: 0.5,
+    sibilance: 0.7,
+    breath: 0.4,
     freq: 6800
   },
   paramHints: {
@@ -32,10 +32,10 @@ function clamp01(v) {
 }
 
 export function createNodes(ctx, params = {}) {
-  const amount = clamp01(params.amount ?? 0.5);
-  const sens = clamp01(params.sensitivity ?? 0.45);
-  const sib = clamp01(params.sibilance ?? 0.6);
-  const breath = clamp01(params.breath ?? 0.35);
+  const amount = clamp01(params.amount ?? 0.6);
+  const sens = clamp01(params.sensitivity ?? 0.5);
+  const sib = clamp01(params.sibilance ?? 0.7);
+  const breath = clamp01(params.breath ?? 0.4);
   const freq = params.freq ?? 6800;
 
   const input = createGain(ctx, 1);

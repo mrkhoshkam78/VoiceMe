@@ -26,13 +26,19 @@ export const meta = {
   icon: 'vocal',
   category: 'studio',
   defaultParams: {
-    strength: 0.9,            // 0–1 separation strength
-    vocalSuppress: 0.8,       // residual vocal cleanup
-    instrumentPreserve: 0.7,  // protect non-vocal energy
-    stereoPreserve: 0.85,     // keep stereo width
-    quality: 'high',          // 'fast' | 'high'
+    intensityMode: 'medium',
+    strength: 0.85,
+    vocalSuppress: 0.75,
+    instrumentPreserve: 0.7,
+    stereoPreserve: 0.85,
+    quality: 'high',
     outputGain: 1.0,
-    intensity: 1.0
+    intensity: 0.9
+  },
+  intensityPresets: {
+    low: { strength: 0.55, vocalSuppress: 0.45, instrumentPreserve: 0.85, intensity: 0.5 },
+    medium: { strength: 0.85, vocalSuppress: 0.75, instrumentPreserve: 0.7, intensity: 0.9 },
+    strong: { strength: 0.98, vocalSuppress: 0.92, instrumentPreserve: 0.55, intensity: 1.0 }
   }
 };
 
@@ -119,6 +125,15 @@ export function createNodes(ctx, params = {}) {
  * Returns AudioBuffer (instrumental). Vocals stem attached as ._vocalsBuffer.
  */
 export async function processOfflineBuffer(audioBuffer, params = {}, onProgress) {
+  const VR_PRESETS = {
+    low: { strength: 0.55, vocalSuppress: 0.45, instrumentPreserve: 0.85, intensity: 0.5 },
+    medium: { strength: 0.85, vocalSuppress: 0.75, instrumentPreserve: 0.7, intensity: 0.9 },
+    strong: { strength: 0.98, vocalSuppress: 0.92, instrumentPreserve: 0.55, intensity: 1.0 }
+  };
+  if (params.intensityMode && VR_PRESETS[params.intensityMode]) {
+    params = { ...VR_PRESETS[params.intensityMode], ...params };
+  }
+
   const strength = clamp((params.strength ?? 0.9) * (params.intensity ?? 1), 0, 1);
   const vocalSuppress = clamp(params.vocalSuppress ?? 0.8, 0, 1);
   const instrumentPreserve = clamp(params.instrumentPreserve ?? 0.7, 0, 1);

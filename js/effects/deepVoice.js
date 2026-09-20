@@ -1,6 +1,6 @@
 /**
- * Male / Deep Voice – V2.5.2 Pro
- * Independent Pitch + Formant (duration preserved). Natural male body.
+ * Professional Male / Deep Voice – V3.0.1
+ * Stronger pitch + formant for clearly audible male character
  */
 import { createGain, createBiquad } from './baseEffect.js';
 import { VOCAL_PRESETS } from '../audio-engine/PitchProcessor.js';
@@ -8,31 +8,34 @@ import { VOCAL_PRESETS } from '../audio-engine/PitchProcessor.js';
 export const meta = {
   id: 'deepVoice',
   name: 'صدای مردانه',
-  description: 'صدای مردانه‌تر و پرتر؛ بدون تغییر سرعت یا مدت فایل',
+  description: 'تغییر واضح به کاراکتر مردانه با pitch + formant (سرعت ثابت)',
   icon: 'deep',
   category: 'voice',
-  defaultParams: { intensity: 0.7 },
+  defaultParams: { mode: 'male', intensity: 0.85 },
   requiresPitchProcess: true,
-  pitchProcessKey: 'deepVoice'
+  pitchProcessKey: 'deepVoice',
+  paramHints: {
+    mode: 'Male عمیق طبیعی',
+    intensity: 'شدت تغییر جنس صدا'
+  },
+  paramRanges: { intensity: [0, 1] }
 };
 
 export function getPitchConfig(params = {}) {
-  const intensity = Math.max(0, Math.min(1, params.intensity ?? 0.7));
-  const preset = VOCAL_PRESETS.male;
-
-  const pitchRatio = 1 + (preset.pitchRatio - 1) * intensity;
-  const formantShift = preset.formantShift * intensity;
-
+  const mode = params.mode || 'male';
+  const intensity = Math.max(0, Math.min(1, params.intensity ?? 0.85));
+  const preset = VOCAL_PRESETS[mode] || VOCAL_PRESETS.male;
   return {
-    pitchRatio,
-    formantShift,
+    pitchRatio: 1 + (preset.pitchRatio - 1) * intensity,
+    formantShift: (preset.formantShift || 0) * intensity,
+    mode,
     intensity,
     eq: {
-      lowShelf: (preset.lowShelf || 3) * intensity,
-      presence: (preset.presence || 1) * intensity,
-      highShelf: (preset.highShelf || -0.8) * intensity,
-      lowCut: preset.lowCut || 50,
-      body: (preset.body || 2) * intensity
+      highShelf: (preset.highShelf || 0) * intensity,
+      presence: (preset.presence || 0) * intensity,
+      lowCut: preset.lowCut || 70,
+      body: (preset.body || 0) * intensity,
+      air: (preset.air || 0) * intensity
     }
   };
 }
@@ -42,40 +45,46 @@ export function createNodes(ctx, params = {}) {
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
 
-  const highpass = createBiquad(ctx, 'highpass', cfg.eq.lowCut || 50, 0.7);
-  const lowShelf = createBiquad(ctx, 'lowshelf', 160, 0.9, Math.min(4, cfg.eq.lowShelf || 2.5));
-  // Chest / body – not muddy
-  const mid = createBiquad(ctx, 'peaking', 380, 0.95, 1.0 + cfg.intensity * 1.5);
-  const highShelf = createBiquad(ctx, 'highshelf', 6500, 0.9, cfg.eq.highShelf || -0.8);
+  const highpass = createBiquad(ctx, 'highpass', cfg.eq.lowCut, 0.7);
+  const body = createBiquad(ctx, 'peaking', 180, 0.85, Math.min(5, (cfg.eq.body || 2) * 1.1));
+  const warmth = createBiquad(ctx, 'lowshelf', 120, 0.8, Math.min(4, 1.5 * (cfg.intensity || 0.85)));
+  const presence = createBiquad(ctx, 'peaking', 2200, 1.0, cfg.eq.presence || -0.5);
+  const air = createBiquad(ctx, 'highshelf', 7000, 0.7, cfg.eq.air || -0.8);
+  // Reduce sparkle for male
+  const darken = createBiquad(ctx, 'peaking', 5000, 1.0, -1.5 * (cfg.intensity || 0.85));
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -17;
+  comp.threshold.value = -18;
   comp.knee.value = 12;
-  comp.ratio.value = 2.0;
-  comp.attack.value = 0.014;
-  comp.release.value = 0.22;
+  comp.ratio.value = 2.2;
+  comp.attack.value = 0.012;
+  comp.release.value = 0.2;
 
-  const makeUp = createGain(ctx, 1 + cfg.intensity * 0.08);
+  const makeup = createGain(ctx, 1.05);
 
   input.connect(highpass);
-  highpass.connect(lowShelf);
-  lowShelf.connect(mid);
-  mid.connect(highShelf);
-  highShelf.connect(comp);
-  comp.connect(makeUp);
-  makeUp.connect(output);
+  highpass.connect(warmth);
+  warmth.connect(body);
+  body.connect(presence);
+  presence.connect(darken);
+  darken.connect(air);
+  air.connect(comp);
+  comp.connect(makeup);
+  makeup.connect(output);
 
   return {
     input, output,
-    nodes: [input, highpass, lowShelf, mid, highShelf, comp, makeUp, output],
+    nodes: [input, highpass, warmth, body, presence, darken, air, comp, makeup, output],
     pitchFactor: 1,
     update(p) {
       const c = getPitchConfig(p);
       const t = ctx.currentTime;
-      lowShelf.gain.setTargetAtTime(Math.min(4, c.eq.lowShelf || 2.5), t, 0.04);
-      mid.gain.setTargetAtTime(1.0 + c.intensity * 1.5, t, 0.04);
-      highShelf.gain.setTargetAtTime(c.eq.highShelf || -0.8, t, 0.04);
-      makeUp.gain.setTargetAtTime(1 + c.intensity * 0.08, t, 0.04);
+      highpass.frequency.setTargetAtTime(c.eq.lowCut, t, 0.04);
+      body.gain.setTargetAtTime(Math.min(5, (c.eq.body || 2) * 1.1), t, 0.04);
+      warmth.gain.setTargetAtTime(Math.min(4, 1.5 * (c.intensity || 0.85)), t, 0.04);
+      presence.gain.setTargetAtTime(c.eq.presence || -0.5, t, 0.04);
+      air.gain.setTargetAtTime(c.eq.air || -0.8, t, 0.04);
+      darken.gain.setTargetAtTime(-1.5 * (c.intensity || 0.85), t, 0.04);
     }
   };
 }
@@ -83,8 +92,8 @@ export function createNodes(ctx, params = {}) {
 export async function processOfflineBuffer(audioBuffer, params = {}, onProgress) {
   const { processPitchPreserveDuration } = await import('../audio-engine/PitchProcessor.js');
   const cfg = getPitchConfig(params);
-  if (onProgress) onProgress(0.3);
+  if (onProgress) onProgress(0.15);
   const pitched = await processPitchPreserveDuration(audioBuffer, cfg.pitchRatio, cfg.formantShift, onProgress);
-  if (onProgress) onProgress(0.9);
+  if (onProgress) onProgress(1);
   return pitched;
 }

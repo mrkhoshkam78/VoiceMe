@@ -14,9 +14,15 @@ export const meta = {
   icon: 'noise',
   category: 'enhancement',
   defaultParams: {
-    strength: 0.45,
-    sensitivity: 0.4,
-    intensity: 0.6
+    intensityMode: 'medium',
+    strength: 0.6,
+    sensitivity: 0.5,
+    intensity: 0.75
+  },
+  intensityPresets: {
+    low: { strength: 0.35, sensitivity: 0.35, intensity: 0.45 },
+    medium: { strength: 0.6, sensitivity: 0.5, intensity: 0.75 },
+    strong: { strength: 0.85, sensitivity: 0.7, intensity: 0.95 }
   },
   paramUnits: { strength: 'ratio', sensitivity: 'ratio', intensity: 'ratio' },
   paramRanges: {
@@ -28,9 +34,16 @@ export const meta = {
 
 function clamp01(v) { return Math.max(0, Math.min(1, Number(v) || 0)); }
 
+const NR_PRESETS = {
+  low: { strength: 0.35, sensitivity: 0.35, intensity: 0.45 },
+  medium: { strength: 0.6, sensitivity: 0.5, intensity: 0.75 },
+  strong: { strength: 0.85, sensitivity: 0.7, intensity: 0.95 }
+};
+
 export function createNodes(ctx, params = {}) {
-  let strength = clamp01(params.strength ?? 0.45) * clamp01(params.intensity ?? 0.6);
-  let sensitivity = clamp01(params.sensitivity ?? 0.4);
+  const pr = NR_PRESETS[params.intensityMode] || null;
+  let strength = clamp01(params.strength ?? pr?.strength ?? 0.6) * clamp01(params.intensity ?? pr?.intensity ?? 0.75);
+  let sensitivity = clamp01(params.sensitivity ?? pr?.sensitivity ?? 0.5);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
@@ -93,8 +106,8 @@ export function createNodes(ctx, params = {}) {
  * Offline: energy-based noise reduction with smooth fades (less choppy)
  */
 export async function processOfflineBuffer(audioBuffer, params = {}, onProgress) {
-  const strength = clamp01(params.strength ?? 0.45) * clamp01(params.intensity ?? 0.6);
-  const sensitivity = clamp01(params.sensitivity ?? 0.4);
+  const strength = clamp01(params.strength ?? 0.55) * clamp01(params.intensity ?? 0.7);
+  const sensitivity = clamp01(params.sensitivity ?? 0.45);
   if (strength < 0.04) return audioBuffer;
 
   const sr = audioBuffer.sampleRate;

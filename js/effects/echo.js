@@ -11,7 +11,7 @@ export const meta = {
   description: 'تأخیر کنترل‌شده با فیلتر و سقف Feedback',
   icon: 'echo',
   category: 'space',
-  defaultParams: { delay: 0.32, feedback: 0.28, mix: 0.28 },
+  defaultParams: { delay: 0.3, feedback: 0.38, mix: 0.45 },
   paramUnits: { delay: 's', feedback: 'ratio', mix: 'ratio' },
   paramRanges: {
     delay: [0.05, 0.9],
@@ -25,9 +25,9 @@ function clamp(v, lo, hi) {
 }
 
 export function createNodes(ctx, params = {}) {
-  let delayTime = clamp(params.delay ?? 0.32, 0.05, 0.9);
-  let feedbackAmt = clamp(params.feedback ?? 0.28, 0, 0.72);
-  let mix = clamp(params.mix ?? 0.28, 0, 1);
+  let delayTime = clamp(params.delay ?? 0.3, 0.05, 0.9);
+  let feedbackAmt = clamp(params.feedback ?? 0.38, 0, 0.72);
+  let mix = clamp(params.mix ?? 0.4, 0, 1);
 
   const input = createGain(ctx, 1);
   const output = createGain(ctx, 1);
