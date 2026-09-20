@@ -129,7 +129,7 @@ export class AudioEngine {
    * - Vocal toggle → process in background, then switch without dropping play state aggressively
    */
   async setEffects(list) {
-    const prev = this.effects;
+    const prev = this.effects || [];
     this.effects = list.map(e => ({
       id: e.id,
       params: { ...e.params },
@@ -147,11 +147,11 @@ export class AudioEngine {
     const t = this.player.currentTime;
 
     if (vocalChanged) {
-      // Heavy path – process first, then one rebuild
+      // Heavy path – process first, then one rebuild so pitch is heard in realtime
       const buf = await this._ensureProcessedBuffer();
       this.player.setBuffer(buf);
       if (wasPlaying) {
-        await this.player.play(t); // single restart at same position
+        await this.player.play(t);
       }
       return;
     }
@@ -160,12 +160,12 @@ export class AudioEngine {
     if (!nextVocal) {
       this.processedBuffer = null;
       this._lastVocalKey = null;
-      if (this.player.buffer !== this.originalBuffer) {
+      if (this.player.buffer !== this.originalBuffer && this.originalBuffer) {
         this.player.setBuffer(this.originalBuffer);
       }
     }
 
-    // Graph structure change (enable/disable live effects) – one rebuild only
+    // Always rebuild live graph when playing so enable/disable is heard immediately
     if (wasPlaying) {
       await this.player.rebuild();
     }
@@ -380,6 +380,18 @@ export class AudioEngine {
 
   async export(options, onProgress) {
     if (!this.originalBuffer) throw new Error('NO_BUFFER');
+    // If AI Vocal Studio produced an output and no manual effects enabled, export that
+    const anyFx = (this.effects || []).some(e => e.enabled);
+    if (this._vsOutputBuffer && !anyFx) {
+      if (onProgress) onProgress(0.5, 'خروجی Vocal Studio...');
+      let rendered = this._vsOutputBuffer;
+      if (this.trackB?.buffer) {
+        if (onProgress) onProgress(0.9, 'ترکیب Track B...');
+        rendered = this._mixTracksForExport(rendered, this.trackB.buffer);
+      }
+      const fileName = this.meta?.name || 'audio';
+      return this.exporter.export(rendered, { ...options, fileName }, onProgress);
+    }
     let rendered = await this.renderer.render(
       this.originalBuffer,
       this.effects,
