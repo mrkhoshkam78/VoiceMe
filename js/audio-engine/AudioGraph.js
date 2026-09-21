@@ -85,6 +85,11 @@ export class AudioGraph {
           console.error('[AudioGraph] effect returned invalid nodes:', effect.id);
           continue;
         }
+        // Skip pure offline effects from live graph (they are bypass/no-op and only
+        // confuse diagnostics). Their real work runs in AudioRenderer / processOffline.
+        if (result.offlineOnly) {
+          continue;
+        }
         this.chain.push({
           id: effect.id,
           nodes: result.nodes || [],
